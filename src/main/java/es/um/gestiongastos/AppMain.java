@@ -1,4 +1,3 @@
-
 package es.um.gestiongastos;
 
 import es.um.gestiongastos.model.*;
