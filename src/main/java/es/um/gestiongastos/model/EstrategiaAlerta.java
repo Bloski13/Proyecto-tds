@@ -1,16 +1,13 @@
-
 package es.um.gestiongastos.model;
 
-import java.util.List;
-
-/**
- * Interfaz de la estrategia que define cuándo debe lanzarse una alerta.
- * Implementaciones concretas pueden comprobar periodos, categorías, etc.
- */
 public interface EstrategiaAlerta {
     /**
-     * Dada la lista de gastos relevantes, devuelve true si la alerta debe dispararse.
-     * Por simplicidad la implementación recibe el importe total de los gastos ya calculado.
+     * Comprueba si la alerta debe dispararse.
+     *
+     * @param importeTotal importe total calculado de los gastos relevantes
+     * @param period periodicidad que aplica en la alerta
+     * @param categoriaOpcional categoría relacionada (puede ser null si la alerta no tiene categoría)
+     * @return true si debe dispararse la alerta
      */
-    boolean comprobar(double importeTotal, Periodicidad period);
+    boolean comprobar(double importeTotal, Periodicidad period, Categoria categoriaOpcional);
 }

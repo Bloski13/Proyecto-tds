@@ -1,8 +1,8 @@
-
 package es.um.gestiongastos.model;
 
 /**
- * Estrategia simple: dispara la alerta cuando el importe total supera un umbral.
+ * Estrategia sencilla: dispara si importeTotal > umbral.
+ * Si la alerta tiene categoría, esta estrategia ignora la categoría (pero podría ampliarse).
  */
 public class EstrategiaPorUmbral implements EstrategiaAlerta {
     private final double umbral;
@@ -12,12 +12,12 @@ public class EstrategiaPorUmbral implements EstrategiaAlerta {
     }
 
     @Override
-    public boolean comprobar(double importeTotal, Periodicidad period) {
+    public boolean comprobar(double importeTotal, Periodicidad period, Categoria categoriaOpcional) {
         return importeTotal > umbral;
     }
 
     @Override
     public String toString() {
-        return String.format("EstrategiaPorUmbral(%.2f)", umbral);
+        return "Umbral(" + umbral + ")";
     }
 }

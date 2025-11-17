@@ -1,23 +1,38 @@
-
 package es.um.gestiongastos.model;
 
 import java.util.Objects;
 
 public class Persona {
     private final String id;
-    private String nombre;
+    private String nombreCompleto;
+    private String nombreUsuario;
+    private String contraseña; // podrías cifrarla después
 
-    public Persona(String id, String nombre) {
+    public Persona(String id, String nombreCompleto, String nombreUsuario, String contraseña) {
+        if (id == null || nombreCompleto == null || nombreUsuario == null || contraseña == null) {
+            throw new IllegalArgumentException("Ningún campo de Persona puede ser nulo");
+        }
         this.id = id;
-        this.nombre = nombre;
+        this.nombreCompleto = nombreCompleto;
+        this.nombreUsuario = nombreUsuario;
+        this.contraseña = contraseña;
     }
 
     public String getId() { return id; }
-    public String getNombre() { return nombre; }
-    public void setNombre(String nombre) { this.nombre = nombre; }
+
+    public String getNombreCompleto() { return nombreCompleto; }
+    public void setNombreCompleto(String nombreCompleto) { this.nombreCompleto = nombreCompleto; }
+
+    public String getNombreUsuario() { return nombreUsuario; }
+    public void setNombreUsuario(String nombreUsuario) { this.nombreUsuario = nombreUsuario; }
+
+    public String getContraseña() { return contraseña; }
+    public void setContraseña(String contraseña) { this.contraseña = contraseña; }
 
     @Override
-    public String toString() { return nombre; }
+    public String toString() {
+        return nombreCompleto + " (@" + nombreUsuario + ")";
+    }
 
     @Override
     public boolean equals(Object o) {
