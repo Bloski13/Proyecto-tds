@@ -26,9 +26,11 @@ public class VentanaPrincipalPersona {
 
     // Acceso al Singleton
     private static final Controlador controlador = Controlador.getInstancia();
-    // LISTA OBSERVABLE: Enlaza los datos del Controlador con la TableView de la GUI
-    private static ObservableList<Gasto> datosGastos = FXCollections.observableArrayList();
     
+    // Elementos de la UI que necesitan actualizarse externamente (STATIC para acceso global en la clase)
+    private static ObservableList<Gasto> datosGastos = FXCollections.observableArrayList();
+    private static ComboBox<String> cbCategoriaRegistro; // Ahora es propiedad de la clase para poder refrescarlo
+
     /**
      * Muestra la ventana principal de gestión de gastos del usuario autenticado.
      */
@@ -60,35 +62,44 @@ public class VentanaPrincipalPersona {
         status.setPadding(new Insets(4, 8, 4, 8));
         root.setBottom(status);
 
-        Scene scene = new Scene(root, 900, 700);
+        Scene scene = new Scene(root, 950, 700);
         stage.setScene(scene);
-        // Así, cuando la consola cambie algo, el controlador ejecutará recargarTablaGastos
-        controlador.setOnModeloCambiado(VentanaPrincipalPersona::recargarTablaGastos);
-        // Carga los gastos existentes
-        recargarTablaGastos();
+
+        // registro del callback...
+        controlador.setOnModeloCambiado(VentanaPrincipalPersona::refrescarInterfazGlobal);
+        refrescarInterfazGlobal();
+        
+        // Cierre total al pulsar la "X" de la ventana
+        stage.setOnCloseRequest(event -> {
+            System.out.println("\nSaliendo del sistema...");
+            // Platform.exit() cierra JavaFX, System.exit(0) mata el hilo de la consola también
+            javafx.application.Platform.exit();
+            System.exit(0);
+        });
         
         stage.show();
     }
 
     /**
-     * Método para recargar la tabla de gastos del usuario actual.
-     * Se llama al inicio y después de cada registro/borrado.
+     * Método maestro que actualiza toda la interfaz gráfica
+     * cuando hay cambios en los datos (Tabla de gastos y ComboBoxes).
      */
-    private static void recargarTablaGastos() {
-        // 1. Limpiamos la lista actual
+    private static void refrescarInterfazGlobal() {
+        // 1. Refrescar Tabla
         datosGastos.clear();
+        datosGastos.addAll(controlador.getGastosUsuarioActual());
         
-        // 2. Obtenemos los gastos del Controlador
-        List<Gasto> listaGastos = controlador.getGastosUsuarioActual();
-        
-        // 3. Añadimos los nuevos gastos a la ObservableList
-        datosGastos.addAll(listaGastos);
-        
-        //System.out.println(">> [GUI] Tabla recargada. Total de gastos: " + listaGastos.size());
+        // 2. Refrescar ComboBox de Registro (si ya fue creado)
+        if (cbCategoriaRegistro != null) {
+            String seleccionPrevia = cbCategoriaRegistro.getValue();
+            cargarCategoriasEnCombo(cbCategoriaRegistro);
+            // Intentar mantener la selección si aún es válida
+            if (seleccionPrevia != null && cbCategoriaRegistro.getItems().contains(seleccionPrevia)) {
+                cbCategoriaRegistro.setValue(seleccionPrevia);
+            }
+        }
     }
-    
-   
-    
+
     // =========================================================
     // PESTAÑA DE GESTIÓN DE GASTOS
     // =========================================================
@@ -117,10 +128,10 @@ public class VentanaPrincipalPersona {
         grid.add(lblTitulo, 0, 0, 4, 1);
         GridPane.setHalignment(lblTitulo, HPos.LEFT);
         
-        // Campos del formulario
+        // --- CAMPOS ESTÁNDAR ---
         Label lblDescripcion = new Label("Descripción:");
         TextField tfDescripcion = new TextField();
-        tfDescripcion.setPromptText("Ej: Café, Gasolina, Cena con amigos");
+        tfDescripcion.setPromptText("Ej: Café, Gasolina...");
         grid.add(lblDescripcion, 0, 1);
         grid.add(tfDescripcion, 1, 1);
 
@@ -135,54 +146,69 @@ public class VentanaPrincipalPersona {
         grid.add(lblFecha, 0, 2);
         grid.add(dpFecha, 1, 2);
 
+        // --- LÓGICA DE CATEGORÍA DINÁMICA ---
         Label lblCategoria = new Label("Categoría:");
-        ObservableList<String> opcionesCategoria = FXCollections.observableArrayList(
-                "Alimentación", "Transporte", "Entretenimiento", "Otras"
-        );
-        ComboBox<String> cbCategoria = new ComboBox<>(opcionesCategoria);
-        cbCategoria.setValue("Alimentación");
-        grid.add(lblCategoria, 2, 2);
-        grid.add(cbCategoria, 3, 2);
         
+        // Inicializamos la variable estática
+        cbCategoriaRegistro = new ComboBox<>();
+        
+        TextField tfNuevaCategoria = new TextField();
+        tfNuevaCategoria.setPromptText("Nombre nueva categoría...");
+        tfNuevaCategoria.setVisible(false); 
+        tfNuevaCategoria.setManaged(false); 
+
+        // Configurar lógica y cargar datos iniciales
+        configurarLogicaComboCategoria(cbCategoriaRegistro, tfNuevaCategoria, null); 
+        cargarCategoriasEnCombo(cbCategoriaRegistro);
+
+        VBox boxCategoria = new VBox(5, cbCategoriaRegistro, tfNuevaCategoria);
+        grid.add(lblCategoria, 2, 2);
+        grid.add(boxCategoria, 3, 2);
+        
+        // --- BOTONES Y ESTADO ---
         Button btnRegistrar = new Button("Registrar Gasto");
         Label lblStatus = new Label("");
-        lblStatus.setStyle("-fx-text-fill: green;");
         
         HBox botones = new HBox(10, btnRegistrar, lblStatus);
         grid.add(botones, 3, 3);
         GridPane.setHalignment(botones, HPos.RIGHT);
 
-        // LÓGICA DEL BOTÓN REGISTRAR
+        // --- ACCIÓN REGISTRAR ---
         btnRegistrar.setOnAction(e -> {
             try {
                 String descripcion = tfDescripcion.getText();
                 double importe = Double.parseDouble(tfImporte.getText());
                 LocalDate fecha = dpFecha.getValue();
-                String categoria = cbCategoria.getValue();
+                
+                // Obtener categoría usando método auxiliar
+                String categoriaFinal = obtenerCategoriaSeleccionada(cbCategoriaRegistro, tfNuevaCategoria);
                 
                 if (descripcion.trim().isEmpty() || importe <= 0 || fecha == null) {
-                     throw new IllegalArgumentException("Datos incompletos o incorrectos.");
+                     throw new IllegalArgumentException("Datos incompletos.");
                 }
 
-                // LLAMADA AL CONTROLADOR (Guarda el gasto en la Persona)
-                controlador.registrarGasto(descripcion, importe, fecha, categoria);
+                controlador.registrarGasto(descripcion, importe, fecha, categoriaFinal);
                 
-                lblStatus.setText("Gasto registrado con éxito.");
+                lblStatus.setText("Gasto guardado.");
                 lblStatus.setStyle("-fx-text-fill: green;");
                 
-                // Limpiar formulario
+                // LIMPIEZA
                 tfDescripcion.clear();
                 tfImporte.clear();
                 dpFecha.setValue(LocalDate.now());
+                tfNuevaCategoria.clear();
+                tfNuevaCategoria.setVisible(false);
+                tfNuevaCategoria.setManaged(false);
+                cbCategoriaRegistro.getSelectionModel().selectFirst();
                 
-                // LLAMADA DE RECARGA TRAS REGISTRO: Refrescar la tabla
-                recargarTablaGastos(); 
+                // NOTA: No hace falta llamar a refrescarInterfazGlobal() aquí manualmente
+                // porque el controlador dispara el callback setOnModeloCambiado.
 
             } catch (NumberFormatException ex) {
-                lblStatus.setText("Error: El importe debe ser un número válido (ej: 15.50).");
+                lblStatus.setText("Error: Importe inválido.");
                 lblStatus.setStyle("-fx-text-fill: red;");
             } catch (IllegalArgumentException ex) {
-                lblStatus.setText("Error: " + ex.getMessage());
+                lblStatus.setText(ex.getMessage());
                 lblStatus.setStyle("-fx-text-fill: red;");
             }
         });
@@ -190,67 +216,174 @@ public class VentanaPrincipalPersona {
         return grid;
     }
 
-    @SuppressWarnings("unchecked")
-	private static TableView<Gasto> crearTablaGastos() {
+    private static TableView<Gasto> crearTablaGastos() {
         TableView<Gasto> table = new TableView<>();
         table.setPlaceholder(new Label("No hay gastos registrados."));
-        
-        // Enlazar la tabla a la ObservableList que controlamos
         table.setItems(datosGastos); 
         
-        // Columna de la Descripción
+        // Columnas
         TableColumn<Gasto, String> colDescripcion = new TableColumn<>("Descripción");
         colDescripcion.setCellValueFactory(new PropertyValueFactory<>("descripcion"));
         colDescripcion.setPrefWidth(250);
 
-        // Columna del Importe
         TableColumn<Gasto, BigDecimal> colImporte = new TableColumn<>("Importe (€)");
         colImporte.setCellValueFactory(new PropertyValueFactory<>("importe"));
         colImporte.setPrefWidth(100);
         
-        // Columna de la Fecha
         TableColumn<Gasto, LocalDate> colFecha = new TableColumn<>("Fecha");
         colFecha.setCellValueFactory(new PropertyValueFactory<>("fecha"));
         colFecha.setPrefWidth(120);
         
-        // Columna de la Categoría
         TableColumn<Gasto, Categoria> colCategoria = new TableColumn<>("Categoría");
         colCategoria.setCellValueFactory(new PropertyValueFactory<>("categoria"));
         colCategoria.setPrefWidth(150);
 
-        // Columna de Acciones (Editar/Borrar)
         TableColumn<Gasto, Void> colAcciones = new TableColumn<>("Acciones");
         colAcciones.setCellFactory(param -> new TableCell<Gasto, Void>() {
-        private final Button btnBorrar = new Button("Borrar");
-        {   
-         // Borrado de gasto
-        btnBorrar.setOnAction(e -> {
-                Gasto gastoABorrar = getTableView().getItems().get(getIndex());
-                controlador.borrarGasto(gastoABorrar.getId());
-                recargarTablaGastos(); // Recargar después de borrar
-            });
-        }
+            private final Button btnBorrar = new Button("Borrar");
+            private final Button btnEditar = new Button("Editar");
+            private final HBox pane = new HBox(5, btnEditar, btnBorrar);
 
-		@Override
-		public void updateItem(Void item, boolean empty) {
-			super.updateItem(item, empty);
-			if (empty) {
-				setGraphic(null);
-			} else {
-				setGraphic(btnBorrar);
-			}
-		}
+            {
+                btnBorrar.setOnAction(e -> {
+                    Gasto gasto = (Gasto) getTableRow().getItem();
+                    if (gasto != null) controlador.borrarGasto(gasto.getId());
+                });
+
+                btnEditar.setOnAction(e -> {
+                    Gasto gasto = (Gasto) getTableRow().getItem();
+                    if (gasto != null) mostrarDialogoEdicion(gasto);
+                });
+                
+                btnBorrar.setStyle("-fx-background-color: #ffcccc; -fx-text-fill: darkred;");
+            }
+
+            @Override
+            public void updateItem(Void item, boolean empty) {
+                super.updateItem(item, empty);
+                setGraphic(empty ? null : pane);
+            }
         });
-        
-        colAcciones.setPrefWidth(80);
-
+        colAcciones.setPrefWidth(140);
         table.getColumns().addAll(colDescripcion, colImporte, colFecha, colCategoria, colAcciones);
 
         return table;
     }
-    
+
     // =========================================================
-    // OTRAS PESTAÑAS (Provisionales)
+    // LÓGICA DE EDICIÓN (Con Categoría Dinámica)
+    // =========================================================
+
+    private static void mostrarDialogoEdicion(Gasto gasto) {
+        Stage dialog = new Stage();
+        dialog.setTitle("Editar Gasto");
+
+        GridPane grid = new GridPane();
+        grid.setHgap(10); grid.setVgap(10); grid.setPadding(new Insets(20));
+
+        TextField tfDesc = new TextField(gasto.getDescripcion());
+        TextField tfImp = new TextField(gasto.getImporte().toString());
+        DatePicker dpFec = new DatePicker(gasto.getFecha());
+
+        // LÓGICA CATEGORIA EDICIÓN (IGUAL QUE REGISTRO)
+        ComboBox<String> cbCatEdit = new ComboBox<>();
+        TextField tfNuevaCatEdit = new TextField();
+        tfNuevaCatEdit.setPromptText("Nombre nueva categoría...");
+        tfNuevaCatEdit.setVisible(false); tfNuevaCatEdit.setManaged(false);
+        
+        // Pasamos 'dialog' como tercer parámetro
+        configurarLogicaComboCategoria(cbCatEdit, tfNuevaCatEdit, dialog);
+        
+        cargarCategoriasEnCombo(cbCatEdit);
+        
+        // Seleccionar la categoría actual del gasto
+        String catActual = gasto.getCategoria().getNombre();
+        if (cbCatEdit.getItems().contains(catActual)) {
+            cbCatEdit.setValue(catActual);
+        } else {
+             // Si por alguna razón no está en la lista, seleccionamos el primero
+             cbCatEdit.getSelectionModel().selectFirst();
+        }
+
+        VBox boxCat = new VBox(5, cbCatEdit, tfNuevaCatEdit);
+
+        grid.add(new Label("Descripción:"), 0, 0); grid.add(tfDesc, 1, 0);
+        grid.add(new Label("Importe (€):"), 0, 1); grid.add(tfImp, 1, 1);
+        grid.add(new Label("Fecha:"), 0, 2);       grid.add(dpFec, 1, 2);
+        grid.add(new Label("Categoría:"), 0, 3);   grid.add(boxCat, 1, 3);
+
+        Button btnGuardar = new Button("Guardar Cambios");
+        Button btnCancelar = new Button("Cancelar");
+        HBox botones = new HBox(10, btnGuardar, btnCancelar);
+        grid.add(botones, 1, 4);
+
+        btnGuardar.setOnAction(e -> {
+            try {
+                String desc = tfDesc.getText();
+                Double imp = Double.parseDouble(tfImp.getText());
+                LocalDate fec = dpFec.getValue();
+                
+                String catFinal = obtenerCategoriaSeleccionada(cbCatEdit, tfNuevaCatEdit);
+
+                controlador.modificarGasto(gasto.getId(), desc, imp, fec, catFinal);
+                dialog.close();
+            } catch (Exception ex) {
+                Alert alert = new Alert(Alert.AlertType.ERROR, "Error: " + ex.getMessage());
+                alert.showAndWait();
+            }
+        });
+
+        btnCancelar.setOnAction(e -> dialog.close());
+        dialog.setScene(new Scene(grid));
+        dialog.showAndWait();
+    }
+
+    // =========================================================
+    // MÉTODOS AUXILIARES (Para no repetir código)
+    // =========================================================
+
+    private static void configurarLogicaComboCategoria(ComboBox<String> cb, TextField tfOculto, Stage stageARedimensionar) {
+        cb.setOnAction(e -> {
+            if ("Nueva categoría...".equals(cb.getValue())) {
+                tfOculto.setVisible(true);
+                tfOculto.setManaged(true);
+                tfOculto.requestFocus();
+            } else {
+                tfOculto.setVisible(false);
+                tfOculto.setManaged(false);
+            }
+            
+            // 🔴 FIX: Si nos han pasado una ventana, recalculamos su tamaño
+            if (stageARedimensionar != null) {
+                stageARedimensionar.sizeToScene();
+            }
+        });
+    }
+
+    private static String obtenerCategoriaSeleccionada(ComboBox<String> cb, TextField tfOculto) {
+        String seleccion = cb.getValue();
+        if ("Nueva categoría...".equals(seleccion)) {
+            String nueva = tfOculto.getText().trim();
+            if (nueva.isEmpty()) throw new IllegalArgumentException("Escriba un nombre para la categoría.");
+            return nueva;
+        }
+        return seleccion;
+    }
+
+    private static void cargarCategoriasEnCombo(ComboBox<String> cb) {
+        ObservableList<String> items = FXCollections.observableArrayList(controlador.getNombresCategorias());
+        items.add("Nueva categoría...");
+        cb.setItems(items);
+        
+        // Seleccionar por defecto
+        if (cb.getValue() == null && !items.isEmpty()) {
+             if (items.contains("Alimentación")) cb.setValue("Alimentación");
+             else cb.getSelectionModel().selectFirst();
+        }
+    }
+
+    // =========================================================
+    // OTRAS PESTAÑAS
     // =========================================================
 
     private static VBox crearPanelInformes() {

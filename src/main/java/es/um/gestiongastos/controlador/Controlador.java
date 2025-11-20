@@ -5,6 +5,7 @@ import es.um.gestiongastos.ui.*;
 import javafx.application.Platform;
 import java.time.LocalDate;
 import java.util.*;
+import java.util.stream.Collectors;
 // Importación necesaria para el dinero
 import java.math.BigDecimal; 
 
@@ -146,6 +147,62 @@ public class Controlador {
         return usuarioAutenticado.getGastos();
     }
     
+    // --- MÉTODOS PARA MODIFICACIÓN DE GASTOS ---
+    /**
+     * Busca un gasto por su ID dentro de la lista del usuario autenticado.
+     * @return El objeto Gasto si existe, o null si no se encuentra.
+     */
+    public Gasto obtenerGastoPorId(String idGasto) {
+        if (usuarioAutenticado == null || idGasto == null) return null;
+        
+        return usuarioAutenticado.getGastos().stream()
+                .filter(g -> g.getId().equals(idGasto))
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * Modifica los datos de un gasto existente.
+     * Si un parámetro es null, se ignora (mantiene el valor original).
+     */
+    public void modificarGasto(String idGasto, String nuevoConcepto, Double nuevoImporte, LocalDate nuevaFecha, String nombreCategoria) {
+        Gasto gasto = obtenerGastoPorId(idGasto);
+        
+        if (gasto == null) {
+            System.err.println("Error: No se encontró el gasto para modificar.");
+            return;
+        }
+
+        // 1. Actualizar Concepto/Descripción
+        if (nuevoConcepto != null && !nuevoConcepto.isEmpty()) {
+            gasto.setDescripcion(nuevoConcepto);
+        }
+
+        // 2. Actualizar Importe (Convirtiendo Double a BigDecimal)
+        if (nuevoImporte != null) {
+            gasto.setImporte(BigDecimal.valueOf(nuevoImporte));
+        }
+
+        // 3. Actualizar Fecha
+        if (nuevaFecha != null) {
+            gasto.setFecha(nuevaFecha);
+        }
+
+        // 4. Actualizar Categoría (Buscando o creando la nueva)
+        if (nombreCategoria != null && !nombreCategoria.isEmpty()) {
+            Categoria nuevaCat = crearCategoriaSiNoExiste(nombreCategoria);
+            gasto.setCategoria(nuevaCat);
+        }
+
+        // 5. Feedback y Notificación
+        System.out.println(">> [Controlador] Gasto modificado correctamente.");
+        System.out.flush(); // Importante para el orden visual en consola
+        
+        notificarModeloCambiado(); // ¡Actualiza la tabla y el menú de consola!
+    }
+    
+    // GESTIÓN DE CATEGORÍAS //
+    
     private Categoria crearCategoriaSiNoExiste(String nombre) {
         String key = nombre.toLowerCase().trim();
         if (!categoriasExistentes.containsKey(key)) {
@@ -155,7 +212,17 @@ public class Controlador {
         }
         return categoriasExistentes.get(key);
     }
-
+    /**
+     * Devuelve una lista con los nombres de todas las categorías registradas en el sistema.
+     * Útil para llenar el ComboBox de la interfaz gráfica.
+     */
+    public List<String> getNombresCategorias() {
+        // Convertimos los valores del mapa a una lista de Strings (nombres)
+        return categoriasExistentes.values().stream()
+                .map(Categoria::getNombre)
+                .sorted() // Orden alfabético para que quede bonito
+                .collect(Collectors.toList());
+    }
     // ================================================================= //
     // Métodos actualizar ventana por acciones de consola y viceversa	 //
     // ================================================================= //

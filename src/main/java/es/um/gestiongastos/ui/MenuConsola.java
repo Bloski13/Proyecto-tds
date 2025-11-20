@@ -54,9 +54,14 @@ public class MenuConsola {
                     opcionListarGastos(); 
                     break;
                 case "0":
-                    salir = true;
+                	salir = true;
                     System.out.println("Saliendo del sistema...");
+                    
+                    // 🔴 AÑADE ESTO: Forzar el cierre de la JVM
+                    javafx.application.Platform.exit(); // Cierra JavaFX ordenadamente
+                    System.exit(0); // Mata todos los hilos inmediatamente
                     break;
+                    
                 default:
                     System.out.println("Opción no reconocida. Intente de nuevo.");
                     imprimirOpciones();
@@ -74,8 +79,9 @@ public class MenuConsola {
         
     }
 
-    // --- ACCIONES ---
-
+    // --- ACCIONES --- //
+    
+    // Registar gasto
     private void opcionRegistrarGasto() {
         try {
             System.out.println("\n--- NUEVO GASTO ---");
@@ -90,31 +96,42 @@ public class MenuConsola {
             String fechaStr = scanner.nextLine();
             LocalDate fecha = LocalDate.parse(fechaStr, formatoFecha);
 
-            System.out.print("Nombre de la Categoría (ej: Alimentación, Transporte): ");
+            // 🔴 NUEVA LÓGICA DE VISUALIZACIÓN DE CATEGORÍAS
+            List<String> categorias = Controlador.getInstancia().getNombresCategorias();
+            
+            System.out.println("------------------------------------------------");
+            if (categorias.isEmpty()) {
+                System.out.println("No hay categorías registradas. La que escribas será la primera.");
+            } else {
+                // Usamos String.join para mostrarlas bonitas separadas por comas
+                System.out.println("Categorías existentes: [" + String.join(", ", categorias) + "]");
+            }
+            System.out.println("ℹ️  NOTA: Escribe una de la lista para seleccionarla.");
+            System.out.println("          Si escribes una palabra distinta, se CREARÁ una nueva categoría.");
+            System.out.println("------------------------------------------------");
+            
+            System.out.print("Nombre de la Categoría: ");
             String nombreCategoria = scanner.nextLine();
 
+            // El controlador ya sabe qué hacer: busca si existe o crea si no existe
             Controlador.getInstancia().registrarGasto(concepto, importe, fecha, nombreCategoria);
-            System.out.println("\n✅ Gasto registrado con éxito.");
+            
+            // (El mensaje de éxito lo imprime el Controlador)
 
         } catch (NumberFormatException e) {
             System.out.println("❌ Error: El importe debe ser un número válido (ej: 15.50).");
-            imprimirOpciones();
         } catch (DateTimeParseException e) {
             System.out.println("❌ Error: Fecha inválida. Asegúrese de usar el formato dd/MM/yyyy.");
-            imprimirOpciones();
         } catch (IllegalArgumentException e) {
             System.out.println("❌ Error de validación: " + e.getMessage());
-            imprimirOpciones();
         } catch (Exception e) {
             System.out.println("❌ Error inesperado: " + e.getMessage());
-            imprimirOpciones();
-            
         }
     }
 
-    // 🔴 NUEVA IMPLEMENTACIÓN: MODIFICAR GASTO
+    //  MODIFICAR GASTO
     private void opcionModificarGasto() {
-    	/**
+    	
         System.out.println("\n--- MODIFICAR GASTO ---");
         System.out.print("Introduzca el ID del gasto a modificar: ");
         String idGasto = scanner.nextLine();
@@ -167,7 +184,7 @@ public class MenuConsola {
             System.out.println("❌ Error: La nueva fecha es inválida. Formato requerido: dd/MM/yyyy.");
         } catch (Exception e) {
             System.out.println("❌ Error inesperado al modificar: " + e.getMessage());
-        }*/
+        }
     	imprimirOpciones();
     }
     // BORRAR GASTO
