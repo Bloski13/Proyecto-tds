@@ -9,7 +9,7 @@ import java.util.stream.Collectors;
  * Cuenta de gasto compartida. Una vez creada la lista de participantes no puede modificarse.
  * Permite distribución equitativa o porcentaje por participante. Guarda saldo y porcentaje por participante.
  */
-public class CuentaGasto {
+public class GastosCompartidos {
     private final String id;
     private String nombre;
     private final List<Participante> participantes; // lista inmutable externamente
@@ -26,7 +26,7 @@ public class CuentaGasto {
      * @param participantes lista de participantes (no nula, tamaño > 0)
      * @param porcentajes mapa Persona->Double con porcentajes (suma 100). Las claves deben coincidir con la lista de participantes si no es nulo.
      */
-    public CuentaGasto(String id, String nombre, Collection<Persona> participantes, Map<Persona, Double> porcentajes) {
+    public GastosCompartidos(String id, String nombre, Collection<Persona> participantes, Map<Persona, Double> porcentajes) {
         if (id == null || nombre == null) throw new IllegalArgumentException("id y nombre no pueden ser nulos");
         if (participantes == null || participantes.isEmpty()) throw new IllegalArgumentException("debe haber al menos un participante al crear la cuenta");
         this.id = id;

@@ -11,16 +11,16 @@ public class MainPruebas {
         System.out.println("--- Prueba de AppGastos (cuentas y alertas) ---");
 
         // --- Preparación básica (categorías, personas) ---
-        Categoria c1 = new Categoria("c1", "Explosivos");
-        Categoria c2 = new Categoria("c2", "Miscelánea");
+        Categoria c1 = new Categoria("Explosivos");
+        Categoria c2 = new Categoria("Miscelánea");
 
         Persona p1 = new Persona("p1", "Patricia Conesa", "patri", "123");
         Persona p2 = new Persona("p2", "Álvaro Sancho", "alvaro", "123");
         Persona p3 = new Persona("p3", "Pablo Asensio", "pablo", "123");
 
-        // --- Prueba de CuentaGasto (como antes) ---
+        // --- Prueba de GastosCompartidos (como antes) ---
         List<Persona> participantes = Arrays.asList(p1, p2, p3);
-        CuentaGasto cuenta = new CuentaGasto("ct1", "Bombas", participantes, null);
+        GastosCompartidos cuenta = new GastosCompartidos("ct1", "Bombas", participantes, null);
 
         System.out.println("Cuenta creada: " + cuenta);
         System.out.println("Porcentajes iniciales:");

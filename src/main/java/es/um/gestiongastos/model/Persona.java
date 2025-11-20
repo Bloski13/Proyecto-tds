@@ -1,5 +1,7 @@
 package es.um.gestiongastos.model;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 public class Persona {
@@ -7,6 +9,7 @@ public class Persona {
     private String nombreCompleto;
     private String nombreUsuario;
     private String contraseña; // podrías cifrarla después
+    private final List<Gasto> gastos; //lista de gastos
 
     public Persona(String id, String nombreCompleto, String nombreUsuario, String contraseña) {
         if (id == null || nombreCompleto == null || nombreUsuario == null || contraseña == null) {
@@ -16,6 +19,7 @@ public class Persona {
         this.nombreCompleto = nombreCompleto;
         this.nombreUsuario = nombreUsuario;
         this.contraseña = contraseña;
+        this.gastos = new ArrayList<>(); // Inicializar la lista
     }
 
     public String getId() { return id; }
@@ -28,7 +32,16 @@ public class Persona {
 
     public String getContraseña() { return contraseña; }
     public void setContraseña(String contraseña) { this.contraseña = contraseña; }
-
+    
+    // Método para que el Controlador pueda agregar un Gasto
+    public void agregarGasto(Gasto gasto) {
+        this.gastos.add(gasto);
+    }
+    
+    // Getter para que la Vista pueda leer la lista
+    public List<Gasto> getGastos() {
+        return gastos;
+    }
     @Override
     public String toString() {
         return nombreCompleto + " (@" + nombreUsuario + ")";
