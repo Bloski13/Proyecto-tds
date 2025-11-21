@@ -56,8 +56,7 @@ public class MenuConsola {
                 case "0":
                 	salir = true;
                     System.out.println("Saliendo del sistema...");
-                    
-                    // 🔴 AÑADE ESTO: Forzar el cierre de la JVM
+                    // Forzar el cierre de la JVM
                     javafx.application.Platform.exit(); // Cierra JavaFX ordenadamente
                     System.exit(0); // Mata todos los hilos inmediatamente
                     break;

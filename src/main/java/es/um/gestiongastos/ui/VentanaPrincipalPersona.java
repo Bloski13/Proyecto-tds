@@ -143,6 +143,17 @@ public class VentanaPrincipalPersona {
 
         Label lblFecha = new Label("Fecha:");
         DatePicker dpFecha = new DatePicker(LocalDate.now());
+        
+        //  Deshabilitar días futuros en el calendario visualmente
+        dpFecha.setDayCellFactory(param -> new DateCell() {
+            @Override
+            public void updateItem(LocalDate date, boolean empty) {
+                super.updateItem(date, empty);
+                // Si la fecha es posterior a hoy, se deshabilita
+                setDisable(empty || date.compareTo(LocalDate.now()) > 0);
+            }
+        });
+        
         grid.add(lblFecha, 0, 2);
         grid.add(dpFecha, 1, 2);
 
@@ -284,7 +295,14 @@ public class VentanaPrincipalPersona {
         TextField tfDesc = new TextField(gasto.getDescripcion());
         TextField tfImp = new TextField(gasto.getImporte().toString());
         DatePicker dpFec = new DatePicker(gasto.getFecha());
-
+        // Deshabilitar días futuros también al editar
+        dpFec.setDayCellFactory(param -> new DateCell() {
+            @Override
+            public void updateItem(LocalDate date, boolean empty) {
+                super.updateItem(date, empty);
+                setDisable(empty || date.compareTo(LocalDate.now()) > 0);
+            }
+        });
         // LÓGICA CATEGORIA EDICIÓN (IGUAL QUE REGISTRO)
         ComboBox<String> cbCatEdit = new ComboBox<>();
         TextField tfNuevaCatEdit = new TextField();
@@ -316,7 +334,7 @@ public class VentanaPrincipalPersona {
         Button btnCancelar = new Button("Cancelar");
         HBox botones = new HBox(10, btnGuardar, btnCancelar);
         grid.add(botones, 1, 4);
-
+        
         btnGuardar.setOnAction(e -> {
             try {
                 String desc = tfDesc.getText();
@@ -324,7 +342,7 @@ public class VentanaPrincipalPersona {
                 LocalDate fec = dpFec.getValue();
                 
                 String catFinal = obtenerCategoriaSeleccionada(cbCatEdit, tfNuevaCatEdit);
-
+                
                 controlador.modificarGasto(gasto.getId(), desc, imp, fec, catFinal);
                 dialog.close();
             } catch (Exception ex) {
@@ -332,6 +350,7 @@ public class VentanaPrincipalPersona {
                 alert.showAndWait();
             }
         });
+        
 
         btnCancelar.setOnAction(e -> dialog.close());
         dialog.setScene(new Scene(grid));

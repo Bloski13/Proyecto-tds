@@ -92,6 +92,9 @@ public class Controlador {
             System.err.println("Error: No hay usuario identificado.");
             return; 
         }
+        if (fecha.isAfter(LocalDate.now())) {
+            throw new IllegalArgumentException("La fecha del gasto no puede ser futura.");
+        }
 
         // 1. Obtener Categoría
         Categoria categoria = crearCategoriaSiNoExiste(nombreCategoria);
@@ -169,37 +172,43 @@ public class Controlador {
         Gasto gasto = obtenerGastoPorId(idGasto);
         
         if (gasto == null) {
-            System.err.println("Error: No se encontró el gasto para modificar.");
-            return;
+            // Puedes lanzar excepción o imprimir error, depende de tu gusto
+            throw new IllegalArgumentException("No se encontró el gasto para modificar.");
         }
 
-        // 1. Actualizar Concepto/Descripción
+        // 🔴 NUEVA VALIDACIÓN: Si hay nueva fecha, comprobar que no sea futura
+        if (nuevaFecha != null && nuevaFecha.isAfter(LocalDate.now())) {
+            throw new IllegalArgumentException("La fecha del gasto no puede ser futura.");
+        }
+
+        // 1. Actualizar Concepto
         if (nuevoConcepto != null && !nuevoConcepto.isEmpty()) {
             gasto.setDescripcion(nuevoConcepto);
         }
 
-        // 2. Actualizar Importe (Convirtiendo Double a BigDecimal)
+        // 2. Actualizar Importe
         if (nuevoImporte != null) {
             gasto.setImporte(BigDecimal.valueOf(nuevoImporte));
         }
 
-        // 3. Actualizar Fecha
+        // 3. Actualizar Fecha (Ya validada arriba)
         if (nuevaFecha != null) {
             gasto.setFecha(nuevaFecha);
         }
 
-        // 4. Actualizar Categoría (Buscando o creando la nueva)
+        // 4. Actualizar Categoría
         if (nombreCategoria != null && !nombreCategoria.isEmpty()) {
             Categoria nuevaCat = crearCategoriaSiNoExiste(nombreCategoria);
             gasto.setCategoria(nuevaCat);
         }
 
-        // 5. Feedback y Notificación
+        // 5. Notificar cambios
         System.out.println(">> [Controlador] Gasto modificado correctamente.");
-        System.out.flush(); // Importante para el orden visual en consola
+        System.out.flush();
         
-        notificarModeloCambiado(); // ¡Actualiza la tabla y el menú de consola!
+        notificarModeloCambiado();
     }
+    
     
     // GESTIÓN DE CATEGORÍAS //
     
