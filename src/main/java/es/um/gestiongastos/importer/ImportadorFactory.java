@@ -1,18 +1,19 @@
-
 package es.um.gestiongastos.importer;
 
-/**
- * Factoría simple para obtener importadores según tipo. Implementación mínima por ahora.
- */
+import java.io.File;
+
 public class ImportadorFactory {
-    public static Importador getImportadorCSV() {
-        return in -> {
-            java.util.List<String> lines = new java.util.ArrayList<>();
-            try (java.io.BufferedReader br = new java.io.BufferedReader(new java.io.InputStreamReader(in))) {
-                String line;
-                while ((line = br.readLine()) != null) lines.add(line);
-            }
-            return lines;
-        };
+    public static IImportadorCuenta getImportador(File archivo) {
+        String nombre = archivo.getName().toLowerCase();
+        
+        if (nombre.endsWith(".json")) {
+            return new AdaptadorJSON();
+        } else if (nombre.endsWith(".yaml") || nombre.endsWith(".yml")) {
+            return new AdaptadorYAML();
+        } else if (nombre.endsWith(".csv") || nombre.endsWith(".txt")) {
+            return new AdaptadorCSV();
+        }
+        
+        throw new IllegalArgumentException("Formato no soportado: " + nombre);
     }
 }

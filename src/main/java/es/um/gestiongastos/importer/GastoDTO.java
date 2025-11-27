@@ -1,11 +1,10 @@
 package es.um.gestiongastos.importer;
 
-import java.time.LocalDate;
-
 public class GastoDTO {
     public String descripcion;
     public double importe;
-    public LocalDate fecha;
+    // El adaptador se encargará de parsear la fecha a LocalDate
+    public String fecha; 
     public String categoria;
     public String nombreUsuarioPagador;
 }

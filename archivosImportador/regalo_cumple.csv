@@ -1,0 +1,14 @@
+# Formato: TIPO;DATOS...
+CUENTA;Regalo Cumpleaños Javi
+
+# PARTICIPANTE;Nombre;Usuario;Porcentaje
+PARTICIPANTE;Patricia Conesa;patri;25.0
+PARTICIPANTE;Luis Ramirez;luis_r;25.0
+PARTICIPANTE;Alvaro Sancho;alvaro;25.0
+PARTICIPANTE;Carlos Ruiz;carlos_r;25.0
+
+# GASTO;Descripcion;Importe;Fecha;Categoria;Pagador
+GASTO;PlayStation 5;450.00;2025-03-15;Regalos;patri
+GASTO;Mando Extra;60.00;2025-03-15;Regalos;luis_r
+GASTO;Juego FIFA;70.00;2025-03-16;Regalos;alvaro
+GASTO;Tarta y Velas;25.50;2025-03-20;Alimentación;carlos_r

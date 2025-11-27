@@ -33,31 +33,48 @@ public class MenuConsola {
         System.out.println("\n=== GESTIÓN DE GASTOS (MODO CONSOLA) ===");
         System.out.println("Sesión activa para: " + usuario.getNombreCompleto());
         System.out.println("----------------------------------------");
+        System.out.println("Sistema listo. Esperando instrucciones...");
 
         boolean salir = false;
         imprimirOpciones();
+        
+        // Bucle principal
         while (!salir) {
+            // Callback para refrescar menú si hay cambios externos
             Controlador.getInstancia().setOnConsolaRefrescar(this::imprimirOpciones);
+            
             if (scanner.hasNextLine()) {
                 String entrada = scanner.nextLine();
 
                 switch (entrada) {
-                    case "1": opcionRegistrarGasto(); break;
-                    case "2": opcionModificarGasto(); break;
-                    case "3": opcionBorrarGasto(); break;
-                    case "4": opcionListarGastos(); break;
+                    case "1": 
+                        opcionRegistrarGasto(); 
+                        break;
+                    case "2": 
+                        opcionModificarGasto(); 
+                        break;
+                    case "3": 
+                        opcionBorrarGasto(); 
+                        break;
+                    case "4": 
+                        opcionListarGastos(); 
+                        break;
                     case "0":
-                        salir = true;
-                        System.out.println("Saliendo del sistema...");
-                        javafx.application.Platform.exit(); 
-                        System.exit(0); 
+                        salir = true; // Rompemos el bucle para salir ordenadamente
                         break;
                     default:
-                        System.out.println("Opción no reconocida. Intente de nuevo.");
+                        System.out.println("❌ Opción no reconocida. Intente de nuevo.");
                         imprimirOpciones();
                 }
             }
         }
+        
+        // Mensaje de despedida al salir del bucle
+        System.out.println("\nCerrando aplicación... ¡Hasta pronto, " + usuario.getNombreUsuario() + "!");
+        
+        // Cierre ordenado
+        javafx.application.Platform.exit(); 
+        System.exit(0); 
     }
     
     private void imprimirOpciones() {
@@ -269,18 +286,14 @@ public class MenuConsola {
         String format = "%-37s | %-20s | %-10s | %-12s | %-15s | %-12s | %-10s%n";
         
         System.out.printf(format, "ID Completo", "Concepto", "Total", "Fecha", "Cuenta", "Pagado Por", "Mi Coste");
-        System.out.println("-".repeat(135));
+        System.out.println("-".repeat(130));
 
         for (Gasto g : gastos) {
-            // Mostramos ID Completo
             String idCompleto = g.getId();
-            
             String desc = g.getDescripcion().length() > 20 ? g.getDescripcion().substring(0, 17)+"..." : g.getDescripcion();
             String cta = g.getCuenta().getNombre().length() > 15 ? g.getCuenta().getNombre().substring(0, 12)+"..." : g.getCuenta().getNombre();
-            
             String pagador = g.getPagador().equals(yo) ? "Mí" : g.getPagador().getNombreUsuario();
             if (pagador.length() > 12) pagador = pagador.substring(0, 9) + "...";
-            
             BigDecimal miParte = g.getCostePara(yo);
             
             System.out.printf(format, 

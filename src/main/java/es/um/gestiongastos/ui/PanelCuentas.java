@@ -82,19 +82,27 @@ public class PanelCuentas {
         btnNueva.setOnAction(e -> mostrarPaso1SeleccionUsuarios()); // Tu método anterior
 
         // BOTÓN IMPORTAR 
-        Button btnImportar = new Button("Importar JSON");
+        Button btnImportar = new Button("Importar Archivo");
         btnImportar.setMaxWidth(Double.MAX_VALUE);
         btnImportar.setStyle("-fx-base: #f39c12;"); 
         btnImportar.setOnAction(e -> {
             FileChooser fileChooser = new FileChooser();
-            fileChooser.setTitle("Seleccionar archivo JSON de Cuenta");
-            fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Archivos JSON", "*.json"));
+            fileChooser.setTitle("Seleccionar archivo de Cuenta");
+            
+            // Filtros para todos los formatos soportados
+            fileChooser.getExtensionFilters().addAll(
+                new FileChooser.ExtensionFilter("Todos los soportados", "*.json", "*.yaml", "*.yml", "*.csv"),
+                new FileChooser.ExtensionFilter("JSON", "*.json"),
+                new FileChooser.ExtensionFilter("YAML", "*.yaml", "*.yml"),
+                new FileChooser.ExtensionFilter("CSV", "*.csv")
+            );
             
             File archivo = fileChooser.showOpenDialog(btnImportar.getScene().getWindow());
             
             if (archivo != null) {
                 try {
-                    controlador.importarCuentaDesdeJSON(archivo);
+                    // Llamada al método genérico
+                    controlador.importarCuenta(archivo);
                     Alert alert = new Alert(Alert.AlertType.INFORMATION, "Cuenta importada correctamente.");
                     alert.show();
                 } catch (Exception ex) {
@@ -199,7 +207,6 @@ public class PanelCuentas {
         
         TableView<FilaPorcentaje> tabla = new TableView<>();
         tabla.setEditable(true);
-        tabla.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
         TableColumn<FilaPorcentaje, String> colUser = new TableColumn<>("Participante");
         colUser.setCellValueFactory(p -> new SimpleStringProperty(p.getValue().persona.getNombreCompleto()));

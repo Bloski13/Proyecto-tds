@@ -1,0 +1,27 @@
+nombre: Piso Compartido Centro
+participantes:
+  - nombreCompleto: Pablo Asensio
+    nombreUsuario: pablo
+    porcentaje: 33.33
+  - nombreCompleto: Alvaro Sancho
+    nombreUsuario: alvaro
+    porcentaje: 33.33
+  - nombreCompleto: Juan Pérez
+    nombreUsuario: juan_p
+    porcentaje: 33.34
+gastos:
+  - descripcion: Compra Mercadona Semanal
+    importe: 125.40
+    fecha: 2025-02-01
+    categoria: Alimentación
+    nombreUsuarioPagador: pablo
+  - descripcion: Factura Internet
+    importe: 45.90
+    fecha: 2025-02-05
+    categoria: Facturas
+    nombreUsuarioPagador: alvaro
+  - descripcion: Productos Limpieza
+    importe: 15.20
+    fecha: 2025-02-02
+    categoria: Hogar
+    nombreUsuarioPagador: juan_p

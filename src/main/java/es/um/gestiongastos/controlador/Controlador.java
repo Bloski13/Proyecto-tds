@@ -2,6 +2,7 @@ package es.um.gestiongastos.controlador;
 
 import es.um.gestiongastos.model.*;
 import es.um.gestiongastos.ui.*;
+import es.um.gestiongastos.importer.*;
 import javafx.application.Platform;
 import java.time.LocalDate;
 import java.util.*;
@@ -10,7 +11,6 @@ import java.math.BigDecimal;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import es.um.gestiongastos.importer.*;
 import java.io.File;
 
 import java.time.LocalDateTime;
@@ -294,93 +294,73 @@ public class Controlador {
         return this.usuarioAutenticado;
     }
     
-    // --- IMPORTACIÓN CON JACKSON ---
+    // IMPORTACIÓN DE ARCHIVOS
 
-    public void importarCuentaDesdeJSON(File archivo) {
+    public void importarCuenta(File archivo) {
         try {
-            // 1. Configurar ObjectMapper
-            ObjectMapper mapper = new ObjectMapper();
-            mapper.registerModule(new JavaTimeModule()); 
-
-            // 2. Leer JSON a DTO
-            CuentaDTO dto = mapper.readValue(archivo, CuentaDTO.class);
-
-            System.out.println(">> [Importador] Leyendo cuenta: " + dto.nombre);
-
-            // 3. Resolver Participantes (Buscar o Crear)
-            Map<Persona, Double> mapaPorcentajes = new HashMap<>();
-            List<Persona> listaParticipantes = new ArrayList<>();
-
-            for (ParticipanteDTO pDto : dto.participantes) {
-                // Buscamos si existe por nombreUsuario
-                Persona persona = usuariosPorNombre.get(pDto.nombreUsuario);
-                
-                if (persona == null) {
-                    // Si no existe, lo CREAMOS (con contraseña por defecto '1234')
-                    System.out.println("   -> Creando nuevo usuario importado: " + pDto.nombreUsuario);
-                    persona = registrarUsuario(pDto.nombreCompleto, pDto.nombreUsuario, "1234");
-                }
-                
-                listaParticipantes.add(persona);
-                // Si el porcentaje viene en el JSON lo usamos, si no calculamos luego
-                mapaPorcentajes.put(persona, pDto.porcentaje); 
-            }
-
-            // 4. Crear la Cuenta Compartida
-            // Usamos la lógica existente. Si los porcentajes suman 0 o están vacíos en el DTO, se recalcularán equitativamente
-            double sumaPorcentajes = mapaPorcentajes.values().stream().mapToDouble(Double::doubleValue).sum();
-            if (Math.abs(sumaPorcentajes - 100.0) > 0.1) {
-                // Si el JSON no trae porcentajes válidos, forzamos null para que sean equitativos
-                mapaPorcentajes = null;
-            }
-
-            // Llamamos a nuestro método interno (que también vincula las personas a la cuenta)
-            String idCuenta = UUID.randomUUID().toString();
-            GastosCompartidos nuevaCuenta = new GastosCompartidos(idCuenta, dto.nombre, listaParticipantes, mapaPorcentajes);
+            // 1. Obtener el adaptador adecuado usando la Factoría
+            IImportadorCuenta importador = ImportadorFactory.getImportador(archivo);
             
-            // Vincular cuenta a los usuarios
-            for (Persona p : listaParticipantes) {
-                p.agregarCuenta(nuevaCuenta);
-            }
+            // 2. Usar el adaptador para obtener el DTO (Patrón Adaptador en acción)
+            CuentaDTO dto = importador.importar(archivo);
 
-            // 5. Importar Gastos
-            if (dto.gastos != null) {
-                for (GastoDTO gDto : dto.gastos) {
-                    // Resolver Categoría
-                    Categoria cat = crearCategoriaSiNoExiste(gDto.categoria);
-                    
-                    // Resolver Pagador
-                    Persona pagador = usuariosPorNombre.get(gDto.nombreUsuarioPagador);
-                    if (pagador == null) {
-                        // Si el pagador no está en la lista de participantes (raro), asignamos al creador o primer user
-                        pagador = listaParticipantes.get(0);
-                    }
-                    
-                    // Crear Gasto
-                    String idGasto = UUID.randomUUID().toString();
-                    Gasto nuevoGasto = new Gasto(
-                        idGasto,
-                        BigDecimal.valueOf(gDto.importe),
-                        gDto.fecha,
-                        cat,
-                        pagador,
-                        gDto.descripcion,
-                        nuevaCuenta
-                    );
-                    
-                    // Añadir a la cuenta
-                    nuevaCuenta.agregarGasto(nuevoGasto);
-                }
-            }
+            System.out.println(">> [Controlador] Importando cuenta: " + dto.nombre);
 
+            // 3. (El resto de la lógica de procesamiento del DTO es IDÉNTICA a la anterior)
+            procesarDTOImportado(dto); // He extraído la lógica a un método privado para limpieza
+            
             notificarModeloCambiado();
-            comprobarAlertas();
-            System.out.println(">> [Importador] Cuenta '" + dto.nombre + "' importada con éxito.");
+            System.out.println(">> [Controlador] Cuenta importada con éxito.");
 
         } catch (Exception e) {
             e.printStackTrace();
-            throw new RuntimeException("Error al importar JSON: " + e.getMessage());
+            throw new RuntimeException("Error al importar: " + e.getMessage());
         }
+    }
+
+    // Método auxiliar privado con la lógica de negocio (Crear usuarios, cuentas, gastos)
+    // Es el mismo código que tenías dentro del try de Jackson, movido aquí.
+    private void procesarDTOImportado(CuentaDTO dto) {
+        Map<Persona, Double> mapaPorcentajes = new HashMap<>();
+        List<Persona> listaParticipantes = new ArrayList<>();
+
+        if (dto.participantes != null) {
+            for (ParticipanteDTO pDto : dto.participantes) {
+                Persona persona = usuariosPorNombre.get(pDto.nombreUsuario);
+                if (persona == null) {
+                    System.out.println("   -> Creando usuario: " + pDto.nombreUsuario);
+                    persona = registrarUsuario(pDto.nombreCompleto, pDto.nombreUsuario, "1234");
+                }
+                listaParticipantes.add(persona);
+                mapaPorcentajes.put(persona, pDto.porcentaje); 
+            }
+        }
+
+        double suma = mapaPorcentajes.values().stream().mapToDouble(Double::doubleValue).sum();
+        if (Math.abs(suma - 100.0) > 0.1) mapaPorcentajes = null;
+
+        String idCuenta = UUID.randomUUID().toString();
+        GastosCompartidos nuevaCuenta = new GastosCompartidos(idCuenta, dto.nombre, listaParticipantes, mapaPorcentajes);
+        
+        for (Persona p : listaParticipantes) p.agregarCuenta(nuevaCuenta);
+
+        if (dto.gastos != null) {
+            for (GastoDTO gDto : dto.gastos) {
+                Categoria cat = crearCategoriaSiNoExiste(gDto.categoria);
+                Persona pagador = usuariosPorNombre.get(gDto.nombreUsuarioPagador);
+                if (pagador == null && !listaParticipantes.isEmpty()) pagador = listaParticipantes.get(0);
+                
+                // Parseo de fecha flexible (el DTO trae String)
+                LocalDate fecha = LocalDate.parse(gDto.fecha); // Asume yyyy-MM-dd estándar
+
+                String idGasto = UUID.randomUUID().toString();
+                Gasto nuevoGasto = new Gasto(idGasto, BigDecimal.valueOf(gDto.importe), fecha, cat, pagador, gDto.descripcion, nuevaCuenta);
+                nuevaCuenta.agregarGasto(nuevoGasto);
+            }
+        }
+        
+        // Importante: comprobar alertas tras importación masiva
+        comprobarAlertas();
     }
     
     // --- GESTIÓN DE ALERTAS Y NOTIFICACIONES ---

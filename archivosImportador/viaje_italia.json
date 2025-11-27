@@ -1,0 +1,50 @@
+{
+  "nombre": "Viaje a Italia 2025",
+  "participantes": [
+    {
+      "nombreCompleto": "Patricia Conesa",
+      "nombreUsuario": "patri",
+      "porcentaje": 40.0
+    },
+    {
+      "nombreCompleto": "Álvaro Sancho",
+      "nombreUsuario": "alvaro",
+      "porcentaje": 30.0
+    },
+    {
+      "nombreCompleto": "Sofía Martín",
+      "nombreUsuario": "sofia_m",
+      "porcentaje": 30.0
+    }
+  ],
+  "gastos": [
+    {
+      "descripcion": "Vuelos Ryanair",
+      "importe": 450.50,
+      "fecha": "2025-05-10",
+      "categoria": "Transporte",
+      "nombreUsuarioPagador": "patri"
+    },
+    {
+      "descripcion": "Airbnb Roma",
+      "importe": 320.00,
+      "fecha": "2025-05-10",
+      "categoria": "Alojamiento",
+      "nombreUsuarioPagador": "alvaro"
+    },
+    {
+      "descripcion": "Cena Trastevere",
+      "importe": 85.00,
+      "fecha": "2025-05-11",
+      "categoria": "Alimentación",
+      "nombreUsuarioPagador": "sofia_m"
+    },
+    {
+      "descripcion": "Museo Vaticano",
+      "importe": 90.00,
+      "fecha": "2025-05-12",
+      "categoria": "Entretenimiento",
+      "nombreUsuarioPagador": "patri"
+    }
+  ]
+}

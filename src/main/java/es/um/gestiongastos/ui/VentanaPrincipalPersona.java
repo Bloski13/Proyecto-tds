@@ -26,23 +26,23 @@ public class VentanaPrincipalPersona {
         TabPane tabPane = new TabPane();
         tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
 
-        // PESTAÑA 1: GESTIÓN
+        // --- PESTAÑA 1: GESTIÓN ---
         Tab tabGastos = new Tab("Gestión de Gastos");
         tabGastos.setContent(PanelGestionGastos.crearVista());
 
-        // PESTAÑA 2: INFORMES 
+        // --- PESTAÑA 2: INFORMES ---
         Tab tabInformes = new Tab("Informes y Gráficos");
         tabInformes.setContent(PanelInformes.crearVista());
 
-        // PESTAÑA 3: CUENTAS Y ALERTAS 
+        // --- PESTAÑA 3: CUENTAS Y ALERTAS ---
         Tab tabCuentasAlertas = new Tab("Cuentas y Alertas");
         
         SplitPane split = new SplitPane();
         
-        // Izquierda: Panel de Cuentas 
+        // Izquierda: Panel de Cuentas
         VBox panelCuentas = PanelCuentas.crearVista();
         
-        // Derecha: Panel de Alertas 
+        // Derecha: Panel de Alertas
         VBox panelAlertas = PanelAlertas.crearVista();
         
         split.getItems().addAll(panelCuentas, panelAlertas);
@@ -60,14 +60,18 @@ public class VentanaPrincipalPersona {
         Scene scene = new Scene(root, 1000, 700);
         stage.setScene(scene);
 
+        // Callback global de refresco
         controlador.setOnModeloCambiado(VentanaPrincipalPersona::refrescarTodo);
         
+        // Carga inicial
         refrescarTodo();
         
         stage.setOnCloseRequest(event -> {
+            System.out.println("\nCerrando aplicación... ¡Hasta pronto, " + autenticado.getNombreUsuario() + "!");
             javafx.application.Platform.exit();
             System.exit(0);
         });
+        
         stage.show();
     }
 
