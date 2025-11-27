@@ -1,6 +1,7 @@
 package es.um.gestiongastos.model;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
@@ -8,8 +9,12 @@ public class Persona {
     private final String id;
     private String nombreCompleto;
     private String nombreUsuario;
-    private String contraseña; // podrías cifrarla después
-    private final List<Gasto> gastos; //lista de gastos
+    private String contraseña;
+    
+    private final List<GastosCompartidos> misCuentas; 
+    
+    private final List<Alerta> alertasConfiguradas;
+    private final List<Notificacion> historialNotificaciones;
 
     public Persona(String id, String nombreCompleto, String nombreUsuario, String contraseña) {
         if (id == null || nombreCompleto == null || nombreUsuario == null || contraseña == null) {
@@ -19,7 +24,9 @@ public class Persona {
         this.nombreCompleto = nombreCompleto;
         this.nombreUsuario = nombreUsuario;
         this.contraseña = contraseña;
-        this.gastos = new ArrayList<>(); // Inicializar la lista
+        this.misCuentas = new ArrayList<>(); 
+        this.alertasConfiguradas = new ArrayList<>();
+        this.historialNotificaciones = new ArrayList<>();
     }
 
     public String getId() { return id; }
@@ -33,15 +40,37 @@ public class Persona {
     public String getContraseña() { return contraseña; }
     public void setContraseña(String contraseña) { this.contraseña = contraseña; }
     
-    // Método para que el Controlador pueda agregar un Gasto
-    public void agregarGasto(Gasto gasto) {
-        this.gastos.add(gasto);
+    public void agregarCuenta(GastosCompartidos cuenta) {
+        if (!misCuentas.contains(cuenta)) {
+            this.misCuentas.add(cuenta);
+        }
     }
     
-    // Getter para que la Vista pueda leer la lista
-    public List<Gasto> getGastos() {
-        return gastos;
+    public List<GastosCompartidos> getCuentas() {
+        return Collections.unmodifiableList(misCuentas);
     }
+    
+    public void agregarAlerta(Alerta alerta) {
+        this.alertasConfiguradas.add(alerta);
+    }
+
+    public void eliminarAlerta(Alerta alerta) {
+        this.alertasConfiguradas.remove(alerta);
+    }
+
+    public List<Alerta> getAlertas() {
+        return Collections.unmodifiableList(alertasConfiguradas);
+    }
+
+    public void agregarNotificacion(Notificacion n) {
+        // Añadimos al principio para que salgan las más nuevas primero
+        this.historialNotificaciones.add(0, n);
+    }
+
+    public List<Notificacion> getNotificaciones() {
+        return Collections.unmodifiableList(historialNotificaciones);
+    }
+    
     @Override
     public String toString() {
         return nombreCompleto + " (@" + nombreUsuario + ")";

@@ -16,14 +16,11 @@ import java.util.function.Consumer;
 
 public class VentanaInicioSesion extends Application {
 
-    // 🔴 FIX: Acceder al Singleton, NO crear una nueva instancia.
     private final Controlador controlador = Controlador.getInstancia();
 
     @Override
     public void start(Stage primaryStage) {
-        // 🔴 FIX: Eliminar la línea 'controlador = new Controlador();'
-        // El Singleton ya ha sido accedido arriba.
-
+        
         Label titulo = new Label("Iniciar sesión");
         titulo.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
 
@@ -62,7 +59,6 @@ public class VentanaInicioSesion extends Application {
 
         Scene scene = new Scene(root);
 
-        // Aceptar: autenticar
         btnAceptar.setOnAction(ev -> {
             lblStatus.setText("");
             String user = tfUsuario.getText() == null ? "" : tfUsuario.getText().trim();
@@ -70,8 +66,6 @@ public class VentanaInicioSesion extends Application {
 
             Optional<Persona> autenticado = controlador.autenticar(user, pwd);
             if (autenticado.isPresent()) {
-                // LLAMADA CORRECTA: El Controlador ahora establece el usuario
-                // y lanza el menú de consola desde dentro de este método.
                 controlador.abrirVentanaPrincipalPersona(autenticado.get());
                 primaryStage.close();
             } else {
@@ -79,10 +73,8 @@ public class VentanaInicioSesion extends Application {
             }
         });
 
-        // Cancelar: cerrar app
         btnCancelar.setOnAction(ev -> primaryStage.close());
 
-        // Registrar: abrir ventana de registro; callback rellena user y pone foco en contraseña
         btnRegistrar.setOnAction(ev -> {
             Consumer<Persona> onCreated = personaCreada -> {
                 tfUsuario.setText(personaCreada.getNombreUsuario());

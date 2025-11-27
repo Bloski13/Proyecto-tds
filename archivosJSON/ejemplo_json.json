@@ -1,0 +1,31 @@
+{
+  "nombre": "Viaje a la Nieve",
+  "participantes": [
+    {
+      "nombreCompleto": "Patricia Conesa",
+      "nombreUsuario": "patri",
+      "porcentaje": 50.0
+    },
+    {
+      "nombreCompleto": "Usuario Nuevo Importado",
+      "nombreUsuario": "nuevo_user",
+      "porcentaje": 50.0
+    }
+  ],
+  "gastos": [
+    {
+      "descripcion": "Hotel",
+      "importe": 200.0,
+      "fecha": "2025-01-15",
+      "categoria": "Alojamiento",
+      "nombreUsuarioPagador": "patri"
+    },
+    {
+      "descripcion": "Cena",
+      "importe": 50.0,
+      "fecha": "2025-01-15",
+      "categoria": "Alimentación",
+      "nombreUsuarioPagador": "nuevo_user"
+    }
+  ]
+}

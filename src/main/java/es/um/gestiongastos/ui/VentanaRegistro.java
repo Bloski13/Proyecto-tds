@@ -14,13 +14,6 @@ import java.util.function.Consumer;
 
 public class VentanaRegistro {
 
-    /**
-     * Muestra una ventana modal para registrar un nuevo usuario.
-     *
-     * @param owner ventana propietaria (puede ser null)
-     * @param controlador controlador con método registrarUsuario(...)
-     * @param onCreated callback que recibirá la Persona creada (puede ser null)
-     */
     public static void mostrar(Stage owner, Controlador controlador, Consumer<Persona> onCreated) {
         Stage stage = new Stage();
         stage.initOwner(owner);
@@ -96,11 +89,9 @@ public class VentanaRegistro {
                 Persona creada = controlador.registrarUsuario(nombre, usuario, pwd);
                 lblStatus.setStyle("-fx-text-fill: green;");
                 lblStatus.setText("Usuario registrado correctamente: " + creada.getNombreUsuario());
-                // llamar callback si existe
                 if (onCreated != null) {
                     onCreated.accept(creada);
                 }
-                // cerrar ventana después de un pequeño delay (o inmediatamente)
                 stage.close();
             } catch (IllegalArgumentException ex) {
                 lblStatus.setStyle("-fx-text-fill: red;");

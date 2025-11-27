@@ -6,8 +6,15 @@ import javafx.application.Platform;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
-// Importación necesaria para el dinero
 import java.math.BigDecimal; 
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import es.um.gestiongastos.importer.*;
+import java.io.File;
+
+import java.time.LocalDateTime;
+import java.time.temporal.WeekFields;
 
 public class Controlador {
 
@@ -16,18 +23,14 @@ public class Controlador {
     private final Map<String, Persona> usuariosPorNombre;
     private final Map<String, Categoria> categoriasExistentes; 
     private Persona usuarioAutenticado;
-    // Guardará la función de refresco de la GUI
-    private Runnable onModeloCambiado; // Runnable es perfecto para esto, no necesita argumentos
-    // Guardará la función de refresco de la Consola
-    private Runnable onConsolaRefrescar;
     
+    private Runnable onModeloCambiado;
+    private Runnable onConsolaRefrescar;
 
-    // Constructor privado (Singleton)
     private Controlador() {
         this.usuariosPorNombre = new LinkedHashMap<>();
         this.categoriasExistentes = new HashMap<>();
         inicializarDatosEjemplo();
-        
     }
 
     public static synchronized Controlador getInstancia() {
@@ -38,13 +41,9 @@ public class Controlador {
     }
 
     private void inicializarDatosEjemplo() {
-        Persona p1 = new Persona("p1", "Patricia Conesa", "patri", "pass1");
-        Persona p2 = new Persona("p2", "Álvaro Sancho", "alvaro", "pass2");
-        Persona p3 = new Persona("p3", "Pablo Asensio", "pablo", "pass3");
-
-        usuariosPorNombre.put(p1.getNombreUsuario(), p1);
-        usuariosPorNombre.put(p2.getNombreUsuario(), p2);
-        usuariosPorNombre.put(p3.getNombreUsuario(), p3);
+        registrarUsuario("Patricia Conesa", "patri", "pass1");
+        registrarUsuario("Álvaro Sancho", "alvaro", "pass2");
+        registrarUsuario("Pablo Asensio", "pablo", "pass3");
 
         crearCategoriaSiNoExiste("Alimentación");
         crearCategoriaSiNoExiste("Transporte");
@@ -64,7 +63,7 @@ public class Controlador {
     }
 
     public Persona registrarUsuario(String nombreCompleto, String nombreUsuario, String contraseña) {
-    	 if (nombreCompleto == null || nombreCompleto.trim().isEmpty()) {
+         if (nombreCompleto == null || nombreCompleto.trim().isEmpty()) {
              throw new IllegalArgumentException("El nombre completo no puede estar vacío");
          }
          if (nombreUsuario == null || nombreUsuario.trim().isEmpty()) {
@@ -79,212 +78,387 @@ public class Controlador {
         String id = UUID.randomUUID().toString();
         Persona nueva = new Persona(id, nombreCompleto, nombreUsuario, contraseña);
         usuariosPorNombre.put(nueva.getNombreUsuario(), nueva);
+        
+        // AUTOMÁTICO: Crear "Cuenta Personal" para este usuario
+        crearCuentaCompartida("Cuenta Personal (" + nueva.getNombreUsuario() + ")", List.of(nueva), null);
+        
         return nueva;
+    }
+    
+    /**
+     * Devuelve lista de usuarios para poder agregarlos a grupos (excluyendo al actual si se desea).
+     */
+    public List<Persona> getTodosLosUsuarios() {
+        return new ArrayList<>(usuariosPorNombre.values());
+    }
+
+    // --- GESTIÓN DE CUENTAS ---
+
+    public void crearCuentaCompartida(String nombre, List<Persona> participantes, Map<Persona, Double> porcentajes) {
+        String id = UUID.randomUUID().toString();
+        GastosCompartidos nuevaCuenta = new GastosCompartidos(id, nombre, participantes, porcentajes);
+        
+        // Vincular la cuenta a TODOS los participantes
+        for (Persona p : participantes) {
+            p.agregarCuenta(nuevaCuenta);
+        }
+        notificarModeloCambiado();
     }
 
     // --- GESTIÓN DE GASTOS ---
 
     /**
-     * Registra un gasto adaptándose al constructor de tu clase Gasto.
+     * Registra un gasto en una cuenta específica.
      */
-    public void registrarGasto(String concepto, double importe, LocalDate fecha, String nombreCategoria) {
+    public void registrarGasto(String concepto, double importe, LocalDate fecha, String nombreCategoria, GastosCompartidos cuentaDestino) {
         if (usuarioAutenticado == null) {
             System.err.println("Error: No hay usuario identificado.");
             return; 
+        }
+        if (cuentaDestino == null) {
+             throw new IllegalArgumentException("Debe seleccionar una cuenta para el gasto.");
         }
         if (fecha.isAfter(LocalDate.now())) {
             throw new IllegalArgumentException("La fecha del gasto no puede ser futura.");
         }
 
-        // 1. Obtener Categoría
         Categoria categoria = crearCategoriaSiNoExiste(nombreCategoria);
+        String idGasto = UUID.randomUUID().toString(); 
+        BigDecimal importeBD = BigDecimal.valueOf(importe); 
 
-        // 2. Preparar datos para tu constructor de Gasto
-        String idGasto = UUID.randomUUID().toString(); // Generamos ID único
-        BigDecimal importeBD = BigDecimal.valueOf(importe); // Convertimos double a BigDecimal
-
-        // 3. Crear el Gasto (Usando tu constructor exacto)
-        // Orden: id, importe, fecha, categoria, pagador, descripcion
         Gasto nuevoGasto = new Gasto(
             idGasto, 
             importeBD, 
             fecha, 
             categoria, 
-            usuarioAutenticado, // El pagador es el usuario actual
-            concepto            // La descripción es el concepto
+            usuarioAutenticado, 
+            concepto,
+            cuentaDestino // Asignamos la cuenta
         );
-        usuarioAutenticado.agregarGasto(nuevoGasto); // Guardamos el gasto en la persona
-        // 4. Guardar/Asignar
         
-        System.out.println("\n>> [Controlador] Gasto creado con éxito:");
-        System.out.println("   " + nuevoGasto);
+        // Delegamos en la cuenta la gestión del gasto y saldos
+        cuentaDestino.agregarGasto(nuevoGasto);
+        
+        System.out.println(">> [Controlador] Gasto creado en cuenta '" + cuentaDestino.getNombre() + "': " + nuevoGasto);
         notificarModeloCambiado();
-        
+        comprobarAlertas();
     }
     
-    /**
-     * Busca y elimina un Gasto de la lista del usuario autenticado por su ID.
-     * @param idGasto El ID único del gasto a borrar.
-     */
     public void borrarGasto(String idGasto) {
-        if (usuarioAutenticado == null) {
-            System.err.println("Error: No hay usuario identificado para borrar el gasto.");
-            return; 
-        }
+        if (usuarioAutenticado == null) return;
 
-        // Usamos removeIf para iterar sobre la lista de gastos del usuario autenticado y eliminar el que coincida con el ID.
-        boolean eliminado = usuarioAutenticado.getGastos().removeIf(gasto -> gasto.getId().equals(idGasto));
-
-        if (eliminado) {
+        // Buscar el gasto en todas las cuentas del usuario
+        // Como el ID es único, paramos al encontrarlo
+        for (GastosCompartidos cuenta : usuarioAutenticado.getCuentas()) {
+            Optional<Gasto> target = cuenta.getGastos().stream()
+                    .filter(g -> g.getId().equals(idGasto))
+                    .findFirst();
             
-            System.out.println("\n>> [Controlador] Gasto con ID " + idGasto + " eliminado con éxito.");
-            notificarModeloCambiado();
-        } else {
-            // Esto solo ocurre si el ID era correcto pero el gasto ya no estaba (raro)
-            System.out.println("\n>> [Controlador] Advertencia: No se encontró ningún gasto con ID " + idGasto + ".");
+            if (target.isPresent()) {
+                cuenta.eliminarGasto(target.get());
+                System.out.println(">> [Controlador] Gasto eliminado de la cuenta " + cuenta.getNombre());
+                notificarModeloCambiado();
+                return;
+            }
         }
+        System.out.println(">> [Controlador] No se encontró gasto con ID " + idGasto);
     }
 
+    /**
+     * Devuelve TODOS los gastos visibles para el usuario (la suma de todas sus cuentas).
+     */
     public List<Gasto> getGastosUsuarioActual() {
         if (usuarioAutenticado == null) return Collections.emptyList();
-        return usuarioAutenticado.getGastos();
+        
+        return usuarioAutenticado.getCuentas().stream()
+                .flatMap(c -> c.getGastos().stream())
+                .collect(Collectors.toList());
     }
     
-    // --- MÉTODOS PARA MODIFICACIÓN DE GASTOS ---
-    /**
-     * Busca un gasto por su ID dentro de la lista del usuario autenticado.
-     * @return El objeto Gasto si existe, o null si no se encuentra.
-     */
     public Gasto obtenerGastoPorId(String idGasto) {
-        if (usuarioAutenticado == null || idGasto == null) return null;
-        
-        return usuarioAutenticado.getGastos().stream()
+        return getGastosUsuarioActual().stream()
                 .filter(g -> g.getId().equals(idGasto))
                 .findFirst()
                 .orElse(null);
     }
 
-    /**
-     * Modifica los datos de un gasto existente.
-     * Si un parámetro es null, se ignora (mantiene el valor original).
-     */
-    public void modificarGasto(String idGasto, String nuevoConcepto, Double nuevoImporte, LocalDate nuevaFecha, String nombreCategoria) {
-        Gasto gasto = obtenerGastoPorId(idGasto);
-        
-        if (gasto == null) {
-            // Puedes lanzar excepción o imprimir error, depende de tu gusto
-            throw new IllegalArgumentException("No se encontró el gasto para modificar.");
-        }
+    public void modificarGasto(String idGasto, String nuevoConcepto, Double nuevoImporte, 
+            LocalDate nuevaFecha, String nombreCategoria, 
+            GastosCompartidos nuevaCuenta, Persona nuevoPagador) { // <--- NUEVO ARGUMENTO
 
-        // 🔴 NUEVA VALIDACIÓN: Si hay nueva fecha, comprobar que no sea futura
-        if (nuevaFecha != null && nuevaFecha.isAfter(LocalDate.now())) {
-            throw new IllegalArgumentException("La fecha del gasto no puede ser futura.");
-        }
-
-        // 1. Actualizar Concepto
-        if (nuevoConcepto != null && !nuevoConcepto.isEmpty()) {
-            gasto.setDescripcion(nuevoConcepto);
-        }
-
-        // 2. Actualizar Importe
-        if (nuevoImporte != null) {
-            gasto.setImporte(BigDecimal.valueOf(nuevoImporte));
-        }
-
-        // 3. Actualizar Fecha (Ya validada arriba)
-        if (nuevaFecha != null) {
-            gasto.setFecha(nuevaFecha);
-        }
-
-        // 4. Actualizar Categoría
-        if (nombreCategoria != null && !nombreCategoria.isEmpty()) {
-            Categoria nuevaCat = crearCategoriaSiNoExiste(nombreCategoria);
-            gasto.setCategoria(nuevaCat);
-        }
-
-        // 5. Notificar cambios
-        System.out.println(">> [Controlador] Gasto modificado correctamente.");
-        System.out.flush();
-        
-        notificarModeloCambiado();
-    }
-    
+		Gasto gasto = obtenerGastoPorId(idGasto);
+		if (gasto == null) throw new IllegalArgumentException("No se encontró el gasto.");
+		
+		GastosCompartidos cuentaOriginal = gasto.getCuenta();
+		
+		// 1. Sacamos el gasto de su cuenta actual (importante para que se recalculen saldos sin él)
+		cuentaOriginal.eliminarGasto(gasto);
+		
+		// 2. Aplicamos cambios básicos
+		if (nuevoConcepto != null && !nuevoConcepto.isEmpty()) gasto.setDescripcion(nuevoConcepto);
+		if (nuevoImporte != null) gasto.setImporte(java.math.BigDecimal.valueOf(nuevoImporte));
+		if (nuevaFecha != null) {
+			if (nuevaFecha.isAfter(LocalDate.now())) throw new IllegalArgumentException("Fecha futura no permitida");
+			gasto.setFecha(nuevaFecha);
+		}
+		
+		if (nombreCategoria != null && !nombreCategoria.isEmpty()) {
+			gasto.setCategoria(crearCategoriaSiNoExiste(nombreCategoria));
+		}
+		
+		// 3. CAMBIO DE PAGADOR
+		if (nuevoPagador != null) {
+			gasto.setPagador(nuevoPagador);
+		}
+		
+		// 4. Gestionamos el cambio de cuenta
+		if (nuevaCuenta != null && !nuevaCuenta.equals(cuentaOriginal)) {
+			// Validar que el pagador pertenece a la nueva cuenta
+			// (Si cambiamos de cuenta, el pagador actual o nuevo debe ser miembro de esa nueva cuenta)
+			Persona pagadorFinal = (nuevoPagador != null) ? nuevoPagador : gasto.getPagador();
+			
+			// Verificación simple: buscamos si el pagador está en la lista de participantes de la nueva cuenta
+			boolean esMiembro = nuevaCuenta.getParticipantes().stream()
+			 .anyMatch(p -> p.getPersona().equals(pagadorFinal));
+			
+			if (!esMiembro) {
+				// Si el pagador no está en la nueva cuenta, reasignamos al usuario actual por defecto o lanzamos error.
+				// Para ser seguros, lanzamos excepción.
+				// Pero como hemos sacado el gasto, debemos meterlo de nuevo en la original antes de fallar para no perderlo.
+				cuentaOriginal.agregarGasto(gasto); 
+				throw new IllegalArgumentException("El pagador " + pagadorFinal.getNombreUsuario() + " no pertenece a la cuenta destino.");
+			}
+			
+			gasto.setCuenta(nuevaCuenta);
+			nuevaCuenta.agregarGasto(gasto); // Añadir y recalcular en la nueva
+			System.out.println(">> [Controlador] Gasto MOVIDO a cuenta '" + nuevaCuenta.getNombre() + "'");
+		} else {
+			// Si es la misma cuenta, lo volvemos a meter (trigger recalculo con nuevo pagador/importe)
+			cuentaOriginal.agregarGasto(gasto);
+		}
+		
+		notificarModeloCambiado();
+		comprobarAlertas();
+	}
     
     // GESTIÓN DE CATEGORÍAS //
     
     private Categoria crearCategoriaSiNoExiste(String nombre) {
         String key = nombre.toLowerCase().trim();
         if (!categoriasExistentes.containsKey(key)) {
-            // Usamos el constructor de Categoria(nombre) que arreglamos antes
             Categoria nueva = new Categoria(nombre); 
             categoriasExistentes.put(key, nueva);
         }
         return categoriasExistentes.get(key);
     }
-    /**
-     * Devuelve una lista con los nombres de todas las categorías registradas en el sistema.
-     * Útil para llenar el ComboBox de la interfaz gráfica.
-     */
+
     public List<String> getNombresCategorias() {
-        // Convertimos los valores del mapa a una lista de Strings (nombres)
         return categoriasExistentes.values().stream()
                 .map(Categoria::getNombre)
-                .sorted() // Orden alfabético para que quede bonito
+                .sorted()
                 .collect(Collectors.toList());
     }
-    // ================================================================= //
-    // Métodos actualizar ventana por acciones de consola y viceversa	 //
-    // ================================================================= //
+
+    // EVENTOS UI //
     
-    // Para que la GUI se registre
     public void setOnModeloCambiado(Runnable callback) {
         this.onModeloCambiado = callback;
     }
     
-    // Para notificar a la GUI
     private void notificarModeloCambiado() {
-    	// Notificar a la GUI (CRÍTICO: debe ir en Platform.runLater)
-        if (onModeloCambiado != null) {
-            // Ejecutamos en el hilo de JavaFX
-            Platform.runLater(onModeloCambiado); 
-        }
-        
-        // Notificar a la Consola (puede ir directamente aquí)
-        if (onConsolaRefrescar != null) {
-            onConsolaRefrescar.run(); // Ejecutamos repintado del menú
-        }
+        if (onModeloCambiado != null) Platform.runLater(onModeloCambiado); 
+        if (onConsolaRefrescar != null) onConsolaRefrescar.run(); 
     }
     
-    // Para que el MenuConsola se registre
     public void setOnConsolaRefrescar(Runnable callback) {
         this.onConsolaRefrescar = callback;
     }
     
-    // --- UI JAVAFX ---
+    // UI JAVAFX //
     public void abrirVentanaPrincipalPersona(Persona autenticado) {
         this.usuarioAutenticado = autenticado;
-        List<Persona> lista = Collections.unmodifiableList(new ArrayList<>(usuariosPorNombre.values()));
+        List<Persona> lista = new ArrayList<>(usuariosPorNombre.values());
         Platform.runLater(() -> VentanaPrincipalPersona.mostrar(lista, autenticado));
         lanzarMenuConsola();
     }
-    /**
-     * Lanza la interfaz de línea de comandos en un hilo separado 
-     * para que no bloquee la interfaz gráfica de JavaFX.
-     */
+
     private void lanzarMenuConsola() {
-        // En este punto, usuarioAutenticado ya está establecido por autenticar()
         if (usuarioAutenticado == null) return;
-        
-        // Creamos y lanzamos un nuevo hilo (Thread)
         new Thread(() -> {
             MenuConsola menu = new MenuConsola();
             menu.iniciar();
         }, "CLI-Thread").start();
-        
-        System.out.println("\n>> [Controlador] Menú de consola lanzado. "
-                         + "Puede interactuar con él en la pestaña 'Console' de Eclipse.");
     }
+    
     public Persona getUsuarioAutenticado() {
         return this.usuarioAutenticado;
+    }
+    
+    // --- IMPORTACIÓN CON JACKSON ---
+
+    public void importarCuentaDesdeJSON(File archivo) {
+        try {
+            // 1. Configurar ObjectMapper
+            ObjectMapper mapper = new ObjectMapper();
+            mapper.registerModule(new JavaTimeModule()); 
+
+            // 2. Leer JSON a DTO
+            CuentaDTO dto = mapper.readValue(archivo, CuentaDTO.class);
+
+            System.out.println(">> [Importador] Leyendo cuenta: " + dto.nombre);
+
+            // 3. Resolver Participantes (Buscar o Crear)
+            Map<Persona, Double> mapaPorcentajes = new HashMap<>();
+            List<Persona> listaParticipantes = new ArrayList<>();
+
+            for (ParticipanteDTO pDto : dto.participantes) {
+                // Buscamos si existe por nombreUsuario
+                Persona persona = usuariosPorNombre.get(pDto.nombreUsuario);
+                
+                if (persona == null) {
+                    // Si no existe, lo CREAMOS (con contraseña por defecto '1234')
+                    System.out.println("   -> Creando nuevo usuario importado: " + pDto.nombreUsuario);
+                    persona = registrarUsuario(pDto.nombreCompleto, pDto.nombreUsuario, "1234");
+                }
+                
+                listaParticipantes.add(persona);
+                // Si el porcentaje viene en el JSON lo usamos, si no calculamos luego
+                mapaPorcentajes.put(persona, pDto.porcentaje); 
+            }
+
+            // 4. Crear la Cuenta Compartida
+            // Usamos la lógica existente. Si los porcentajes suman 0 o están vacíos en el DTO, se recalcularán equitativamente
+            double sumaPorcentajes = mapaPorcentajes.values().stream().mapToDouble(Double::doubleValue).sum();
+            if (Math.abs(sumaPorcentajes - 100.0) > 0.1) {
+                // Si el JSON no trae porcentajes válidos, forzamos null para que sean equitativos
+                mapaPorcentajes = null;
+            }
+
+            // Llamamos a nuestro método interno (que también vincula las personas a la cuenta)
+            String idCuenta = UUID.randomUUID().toString();
+            GastosCompartidos nuevaCuenta = new GastosCompartidos(idCuenta, dto.nombre, listaParticipantes, mapaPorcentajes);
+            
+            // Vincular cuenta a los usuarios
+            for (Persona p : listaParticipantes) {
+                p.agregarCuenta(nuevaCuenta);
+            }
+
+            // 5. Importar Gastos
+            if (dto.gastos != null) {
+                for (GastoDTO gDto : dto.gastos) {
+                    // Resolver Categoría
+                    Categoria cat = crearCategoriaSiNoExiste(gDto.categoria);
+                    
+                    // Resolver Pagador
+                    Persona pagador = usuariosPorNombre.get(gDto.nombreUsuarioPagador);
+                    if (pagador == null) {
+                        // Si el pagador no está en la lista de participantes (raro), asignamos al creador o primer user
+                        pagador = listaParticipantes.get(0);
+                    }
+                    
+                    // Crear Gasto
+                    String idGasto = UUID.randomUUID().toString();
+                    Gasto nuevoGasto = new Gasto(
+                        idGasto,
+                        BigDecimal.valueOf(gDto.importe),
+                        gDto.fecha,
+                        cat,
+                        pagador,
+                        gDto.descripcion,
+                        nuevaCuenta
+                    );
+                    
+                    // Añadir a la cuenta
+                    nuevaCuenta.agregarGasto(nuevoGasto);
+                }
+            }
+
+            notificarModeloCambiado();
+            comprobarAlertas();
+            System.out.println(">> [Importador] Cuenta '" + dto.nombre + "' importada con éxito.");
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("Error al importar JSON: " + e.getMessage());
+        }
+    }
+    
+    // --- GESTIÓN DE ALERTAS Y NOTIFICACIONES ---
+
+    public void crearAlerta(String nombre, Periodicidad periodicidad, String nombreCategoria, double umbralMaximo) {
+        if (usuarioAutenticado == null) return;
+        
+        Categoria cat = null;
+        if (nombreCategoria != null && !nombreCategoria.equals("Todas") && !nombreCategoria.isEmpty()) {
+            cat = crearCategoriaSiNoExiste(nombreCategoria);
+        }
+
+        String id = UUID.randomUUID().toString();
+        // Usamos el Patrón Estrategia: "EstrategiaPorUmbral"
+        Alerta alerta = new Alerta(id, nombre, periodicidad, cat, new EstrategiaPorUmbral(umbralMaximo));
+        
+        usuarioAutenticado.agregarAlerta(alerta);
+        
+        System.out.println(">> [Controlador] Alerta creada: " + alerta);
+        
+        // Comprobamos inmediatamente por si ya se ha pasado
+        comprobarAlertas();
+        notificarModeloCambiado();
+    }
+
+    public void borrarAlerta(Alerta alerta) {
+        if (usuarioAutenticado != null) {
+            usuarioAutenticado.eliminarAlerta(alerta);
+            notificarModeloCambiado();
+        }
+    }
+
+    /**
+     * Recorre todas las alertas del usuario, calcula el gasto acumulado relevante
+     * y genera notificaciones si corresponde.
+     */
+    private void comprobarAlertas() {
+        if (usuarioAutenticado == null) return;
+
+        List<Gasto> todosLosGastos = getGastosUsuarioActual(); // Obtiene gastos de todas las cuentas
+        LocalDate hoy = LocalDate.now();
+
+        for (Alerta alerta : usuarioAutenticado.getAlertas()) {
+            
+            // 1. Filtrar gastos que aplican a esta alerta (Fecha y Categoría)
+            double totalAcumulado = todosLosGastos.stream()
+                .filter(g -> {
+                    // A. Filtro de Categoría
+                    if (alerta.getCategoriaOpcional().isPresent()) {
+                        if (!g.getCategoria().equals(alerta.getCategoriaOpcional().get())) return false;
+                    }
+                    
+                    // B. Filtro de Periodicidad
+                    if (alerta.getPeriodicidad() == Periodicidad.MENSUAL) {
+                        // Mismo mes y año
+                        return g.getFecha().getMonth() == hoy.getMonth() && g.getFecha().getYear() == hoy.getYear();
+                    } else {
+                        WeekFields weekFields = WeekFields.of(Locale.getDefault());
+                        int semanaGasto = g.getFecha().get(weekFields.weekOfWeekBasedYear());
+                        int semanaHoy = hoy.get(weekFields.weekOfWeekBasedYear());
+                        return semanaGasto == semanaHoy && g.getFecha().getYear() == hoy.getYear();
+                    }
+                })
+                .mapToDouble(g -> g.getCostePara(usuarioAutenticado).doubleValue()) // Importante: Usamos MI coste
+                .sum();
+
+            // 2. Preguntar a la alerta (Estrategia) si se dispara
+            if (alerta.comprobar(totalAcumulado)) {
+                generarNotificacion(alerta, totalAcumulado);
+            }
+        }
+    }
+
+    private void generarNotificacion(Alerta alerta, double totalActual) {
+        String mensaje = String.format("¡Cuidado! Has superado tu límite en '%s'. Llevas %.2f €.", 
+                                       alerta.getNombre(), totalActual);
+        
+        Notificacion notif = new Notificacion(UUID.randomUUID().toString(), LocalDateTime.now(), mensaje);
+        usuarioAutenticado.agregarNotificacion(notif);
     }
 }
