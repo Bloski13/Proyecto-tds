@@ -3,16 +3,15 @@ package es.um.gestiongastos.controlador;
 import es.um.gestiongastos.model.*;
 import es.um.gestiongastos.ui.*;
 import es.um.gestiongastos.importer.*;
+// Importamos directamente la clase concreta, sin interfaz
+import es.um.gestiongastos.persistencia.RepositorioJSON;
+
 import javafx.application.Platform;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
-import java.math.BigDecimal; 
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import java.math.BigDecimal;
 import java.io.File;
-
 import java.time.LocalDateTime;
 import java.time.temporal.WeekFields;
 
@@ -20,17 +19,17 @@ public class Controlador {
 
     private static Controlador instancia;
 
-    private final Map<String, Persona> usuariosPorNombre;
-    private final Map<String, Categoria> categoriasExistentes; 
+    // Referencia directa a la clase concreta
+    private final RepositorioJSON repositorio;
+    
     private Persona usuarioAutenticado;
     
     private Runnable onModeloCambiado;
     private Runnable onConsolaRefrescar;
 
     private Controlador() {
-        this.usuariosPorNombre = new LinkedHashMap<>();
-        this.categoriasExistentes = new HashMap<>();
-        inicializarDatosEjemplo();
+        this.repositorio = new RepositorioJSON();
+        
     }
 
     public static synchronized Controlador getInstancia() {
@@ -40,21 +39,16 @@ public class Controlador {
         return instancia;
     }
 
-    private void inicializarDatosEjemplo() {
-        registrarUsuario("Patricia Conesa", "patri", "pass1");
-        registrarUsuario("Álvaro Sancho", "alvaro", "pass2");
-        registrarUsuario("Pablo Asensio", "pablo", "pass3");
 
-        crearCategoriaSiNoExiste("Alimentación");
-        crearCategoriaSiNoExiste("Transporte");
-        crearCategoriaSiNoExiste("Entretenimiento");
-    }
     
     // --- GESTIÓN DE USUARIOS ---
 
     public Optional<Persona> autenticar(String nombreUsuario, String contraseña) {
         if (nombreUsuario == null || contraseña == null) return Optional.empty();
-        Persona p = usuariosPorNombre.get(nombreUsuario);
+        
+        // Buscamos directamente en el repositorio
+        Persona p = repositorio.buscarUsuarioPorNombre(nombreUsuario);
+        
         if (p != null && contraseña.equals(p.getContraseña())) {
             this.usuarioAutenticado = p; 
             return Optional.of(p);
@@ -72,24 +66,26 @@ public class Controlador {
          if (contraseña == null || contraseña.isEmpty()) {
              throw new IllegalArgumentException("La contraseña no puede estar vacía");
          }
-         if (usuariosPorNombre.containsKey(nombreUsuario)) {
+         
+         // Validación contra el repo
+         if (repositorio.buscarUsuarioPorNombre(nombreUsuario) != null) {
              throw new IllegalArgumentException("El nombre de usuario ya existe: " + nombreUsuario);
          }
+
         String id = UUID.randomUUID().toString();
         Persona nueva = new Persona(id, nombreCompleto, nombreUsuario, contraseña);
-        usuariosPorNombre.put(nueva.getNombreUsuario(), nueva);
         
-        // AUTOMÁTICO: Crear "Cuenta Personal" para este usuario
+        // Guardamos en persistencia
+        repositorio.registrarUsuario(nueva);
+        
+        // Creamos su cuenta personal (esto modifica al usuario 'nueva', así que habrá que actualizarlo)
         crearCuentaCompartida("Cuenta Personal (" + nueva.getNombreUsuario() + ")", List.of(nueva), null);
         
         return nueva;
     }
     
-    /**
-     * Devuelve lista de usuarios para poder agregarlos a grupos (excluyendo al actual si se desea).
-     */
     public List<Persona> getTodosLosUsuarios() {
-        return new ArrayList<>(usuariosPorNombre.values());
+        return repositorio.getUsuarios();
     }
 
     // --- GESTIÓN DE CUENTAS ---
@@ -98,18 +94,16 @@ public class Controlador {
         String id = UUID.randomUUID().toString();
         GastosCompartidos nuevaCuenta = new GastosCompartidos(id, nombre, participantes, porcentajes);
         
-        // Vincular la cuenta a TODOS los participantes
+        // Vinculamos la cuenta a los participantes y guardamos los cambios de cada persona
         for (Persona p : participantes) {
             p.agregarCuenta(nuevaCuenta);
+            repositorio.actualizarUsuario(p); // Forzamos guardado del usuario modificado
         }
         notificarModeloCambiado();
     }
 
     // --- GESTIÓN DE GASTOS ---
 
-    /**
-     * Registra un gasto en una cuenta específica.
-     */
     public void registrarGasto(String concepto, double importe, LocalDate fecha, String nombreCategoria, GastosCompartidos cuentaDestino) {
         if (usuarioAutenticado == null) {
             System.err.println("Error: No hay usuario identificado.");
@@ -122,7 +116,9 @@ public class Controlador {
             throw new IllegalArgumentException("La fecha del gasto no puede ser futura.");
         }
 
+        // Recuperamos la categoría del repo (o la creamos y guardamos)
         Categoria categoria = crearCategoriaSiNoExiste(nombreCategoria);
+        
         String idGasto = UUID.randomUUID().toString(); 
         BigDecimal importeBD = BigDecimal.valueOf(importe); 
 
@@ -133,13 +129,18 @@ public class Controlador {
             categoria, 
             usuarioAutenticado, 
             concepto,
-            cuentaDestino // Asignamos la cuenta
+            cuentaDestino
         );
         
-        // Delegamos en la cuenta la gestión del gasto y saldos
+        // Modificamos el modelo en memoria
         cuentaDestino.agregarGasto(nuevoGasto);
         
         System.out.println(">> [Controlador] Gasto creado en cuenta '" + cuentaDestino.getNombre() + "': " + nuevoGasto);
+        
+        // PERSISTENCIA: Al añadir un gasto, cambia el estado de la Cuenta y del Usuario.
+        // Guardamos el usuario actual (que contiene la cuenta) para persistir todo el árbol.
+        repositorio.actualizarUsuario(usuarioAutenticado);
+        
         notificarModeloCambiado();
         comprobarAlertas();
     }
@@ -147,8 +148,6 @@ public class Controlador {
     public void borrarGasto(String idGasto) {
         if (usuarioAutenticado == null) return;
 
-        // Buscar el gasto en todas las cuentas del usuario
-        // Como el ID es único, paramos al encontrarlo
         for (GastosCompartidos cuenta : usuarioAutenticado.getCuentas()) {
             Optional<Gasto> target = cuenta.getGastos().stream()
                     .filter(g -> g.getId().equals(idGasto))
@@ -157,6 +156,10 @@ public class Controlador {
             if (target.isPresent()) {
                 cuenta.eliminarGasto(target.get());
                 System.out.println(">> [Controlador] Gasto eliminado de la cuenta " + cuenta.getNombre());
+                
+                // Guardamos cambios
+                repositorio.actualizarUsuario(usuarioAutenticado);
+                
                 notificarModeloCambiado();
                 return;
             }
@@ -164,9 +167,6 @@ public class Controlador {
         System.out.println(">> [Controlador] No se encontró gasto con ID " + idGasto);
     }
 
-    /**
-     * Devuelve TODOS los gastos visibles para el usuario (la suma de todas sus cuentas).
-     */
     public List<Gasto> getGastosUsuarioActual() {
         if (usuarioAutenticado == null) return Collections.emptyList();
         
@@ -184,82 +184,79 @@ public class Controlador {
 
     public void modificarGasto(String idGasto, String nuevoConcepto, Double nuevoImporte, 
             LocalDate nuevaFecha, String nombreCategoria, 
-            GastosCompartidos nuevaCuenta, Persona nuevoPagador) { // <--- NUEVO ARGUMENTO
+            GastosCompartidos nuevaCuenta, Persona nuevoPagador) {
 
-		Gasto gasto = obtenerGastoPorId(idGasto);
-		if (gasto == null) throw new IllegalArgumentException("No se encontró el gasto.");
-		
-		GastosCompartidos cuentaOriginal = gasto.getCuenta();
-		
-		// 1. Sacamos el gasto de su cuenta actual (importante para que se recalculen saldos sin él)
-		cuentaOriginal.eliminarGasto(gasto);
-		
-		// 2. Aplicamos cambios básicos
-		if (nuevoConcepto != null && !nuevoConcepto.isEmpty()) gasto.setDescripcion(nuevoConcepto);
-		if (nuevoImporte != null) gasto.setImporte(java.math.BigDecimal.valueOf(nuevoImporte));
-		if (nuevaFecha != null) {
-			if (nuevaFecha.isAfter(LocalDate.now())) throw new IllegalArgumentException("Fecha futura no permitida");
-			gasto.setFecha(nuevaFecha);
-		}
-		
-		if (nombreCategoria != null && !nombreCategoria.isEmpty()) {
-			gasto.setCategoria(crearCategoriaSiNoExiste(nombreCategoria));
-		}
-		
-		// 3. CAMBIO DE PAGADOR
-		if (nuevoPagador != null) {
-			gasto.setPagador(nuevoPagador);
-		}
-		
-		// 4. Gestionamos el cambio de cuenta
-		if (nuevaCuenta != null && !nuevaCuenta.equals(cuentaOriginal)) {
-			// Validar que el pagador pertenece a la nueva cuenta
-			// (Si cambiamos de cuenta, el pagador actual o nuevo debe ser miembro de esa nueva cuenta)
-			Persona pagadorFinal = (nuevoPagador != null) ? nuevoPagador : gasto.getPagador();
-			
-			// Verificación simple: buscamos si el pagador está en la lista de participantes de la nueva cuenta
-			boolean esMiembro = nuevaCuenta.getParticipantes().stream()
-			 .anyMatch(p -> p.getPersona().equals(pagadorFinal));
-			
-			if (!esMiembro) {
-				// Si el pagador no está en la nueva cuenta, reasignamos al usuario actual por defecto o lanzamos error.
-				// Para ser seguros, lanzamos excepción.
-				// Pero como hemos sacado el gasto, debemos meterlo de nuevo en la original antes de fallar para no perderlo.
-				cuentaOriginal.agregarGasto(gasto); 
-				throw new IllegalArgumentException("El pagador " + pagadorFinal.getNombreUsuario() + " no pertenece a la cuenta destino.");
-			}
-			
-			gasto.setCuenta(nuevaCuenta);
-			nuevaCuenta.agregarGasto(gasto); // Añadir y recalcular en la nueva
-			System.out.println(">> [Controlador] Gasto MOVIDO a cuenta '" + nuevaCuenta.getNombre() + "'");
-		} else {
-			// Si es la misma cuenta, lo volvemos a meter (trigger recalculo con nuevo pagador/importe)
-			cuentaOriginal.agregarGasto(gasto);
-		}
-		
-		notificarModeloCambiado();
-		comprobarAlertas();
-	}
+        Gasto gasto = obtenerGastoPorId(idGasto);
+        if (gasto == null) throw new IllegalArgumentException("No se encontró el gasto.");
+        
+        GastosCompartidos cuentaOriginal = gasto.getCuenta();
+        
+        // 1. Sacamos el gasto temporalmente
+        cuentaOriginal.eliminarGasto(gasto);
+        
+        // 2. Aplicamos cambios
+        if (nuevoConcepto != null && !nuevoConcepto.isEmpty()) gasto.setDescripcion(nuevoConcepto);
+        if (nuevoImporte != null) gasto.setImporte(BigDecimal.valueOf(nuevoImporte));
+        if (nuevaFecha != null) {
+            if (nuevaFecha.isAfter(LocalDate.now())) throw new IllegalArgumentException("Fecha futura no permitida");
+            gasto.setFecha(nuevaFecha);
+        }
+        
+        if (nombreCategoria != null && !nombreCategoria.isEmpty()) {
+            gasto.setCategoria(crearCategoriaSiNoExiste(nombreCategoria));
+        }
+        
+        if (nuevoPagador != null) {
+            gasto.setPagador(nuevoPagador);
+        }
+        
+        // 3. Gestionamos cambio de cuenta
+        if (nuevaCuenta != null && !nuevaCuenta.equals(cuentaOriginal)) {
+            Persona pagadorFinal = (nuevoPagador != null) ? nuevoPagador : gasto.getPagador();
+            boolean esMiembro = nuevaCuenta.getParticipantes().stream()
+             .anyMatch(p -> p.getPersona().equals(pagadorFinal));
+            
+            if (!esMiembro) {
+                cuentaOriginal.agregarGasto(gasto); // Restaurar si falla
+                throw new IllegalArgumentException("El pagador no pertenece a la cuenta destino.");
+            }
+            
+            gasto.setCuenta(nuevaCuenta);
+            nuevaCuenta.agregarGasto(gasto);
+        } else {
+            cuentaOriginal.agregarGasto(gasto);
+        }
+        
+        // Guardamos cambios
+        repositorio.actualizarUsuario(usuarioAutenticado);
+        
+        notificarModeloCambiado();
+        comprobarAlertas();
+    }
     
-    // GESTIÓN DE CATEGORÍAS //
+    // --- GESTIÓN DE CATEGORÍAS ---
     
     private Categoria crearCategoriaSiNoExiste(String nombre) {
-        String key = nombre.toLowerCase().trim();
-        if (!categoriasExistentes.containsKey(key)) {
-            Categoria nueva = new Categoria(nombre); 
-            categoriasExistentes.put(key, nueva);
+        String key = nombre.trim();
+        // Buscamos en el repo
+        Categoria existente = repositorio.buscarCategoriaPorNombre(key);
+        
+        if (existente == null) {
+            Categoria nueva = new Categoria(key);
+            repositorio.registrarCategoria(nueva); // Persistir
+            return nueva;
         }
-        return categoriasExistentes.get(key);
+        return existente;
     }
 
     public List<String> getNombresCategorias() {
-        return categoriasExistentes.values().stream()
+        return repositorio.getCategorias().stream()
                 .map(Categoria::getNombre)
                 .sorted()
                 .collect(Collectors.toList());
     }
 
-    // EVENTOS UI //
+    // --- EVENTOS UI ---
     
     public void setOnModeloCambiado(Runnable callback) {
         this.onModeloCambiado = callback;
@@ -274,10 +271,12 @@ public class Controlador {
         this.onConsolaRefrescar = callback;
     }
     
-    // UI JAVAFX //
+    // --- UI Y APP ---
+    
     public void abrirVentanaPrincipalPersona(Persona autenticado) {
         this.usuarioAutenticado = autenticado;
-        List<Persona> lista = new ArrayList<>(usuariosPorNombre.values());
+        // Obtenemos lista actualizada del repo
+        List<Persona> lista = repositorio.getUsuarios();
         Platform.runLater(() -> VentanaPrincipalPersona.mostrar(lista, autenticado));
         lanzarMenuConsola();
     }
@@ -294,23 +293,22 @@ public class Controlador {
         return this.usuarioAutenticado;
     }
     
-    // IMPORTACIÓN DE ARCHIVOS
+    // --- IMPORTACIÓN ---
 
     public void importarCuenta(File archivo) {
         try {
-            // 1. Obtener el adaptador adecuado usando la Factoría
             IImportadorCuenta importador = ImportadorFactory.getImportador(archivo);
-            
-            // 2. Usar el adaptador para obtener el DTO (Patrón Adaptador en acción)
             CuentaDTO dto = importador.importar(archivo);
-
             System.out.println(">> [Controlador] Importando cuenta: " + dto.nombre);
 
-            // 3. (El resto de la lógica de procesamiento del DTO es IDÉNTICA a la anterior)
-            procesarDTOImportado(dto); // He extraído la lógica a un método privado para limpieza
+            procesarDTOImportado(dto);
+            
+            // Persistir tras importar
+            if (usuarioAutenticado != null) {
+                repositorio.actualizarUsuario(usuarioAutenticado);
+            }
             
             notificarModeloCambiado();
-            System.out.println(">> [Controlador] Cuenta importada con éxito.");
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -318,17 +316,18 @@ public class Controlador {
         }
     }
 
-    // Método auxiliar privado con la lógica de negocio (Crear usuarios, cuentas, gastos)
-    // Es el mismo código que tenías dentro del try de Jackson, movido aquí.
     private void procesarDTOImportado(CuentaDTO dto) {
         Map<Persona, Double> mapaPorcentajes = new HashMap<>();
         List<Persona> listaParticipantes = new ArrayList<>();
 
         if (dto.participantes != null) {
             for (ParticipanteDTO pDto : dto.participantes) {
-                Persona persona = usuariosPorNombre.get(pDto.nombreUsuario);
+                // Buscamos en el repo
+                Persona persona = repositorio.buscarUsuarioPorNombre(pDto.nombreUsuario);
+                
                 if (persona == null) {
-                    System.out.println("   -> Creando usuario: " + pDto.nombreUsuario);
+                    System.out.println("   -> Creando usuario importado: " + pDto.nombreUsuario);
+                    // Esto ya guarda automáticamente dentro de registrarUsuario
                     persona = registrarUsuario(pDto.nombreCompleto, pDto.nombreUsuario, "1234");
                 }
                 listaParticipantes.add(persona);
@@ -342,28 +341,27 @@ public class Controlador {
         String idCuenta = UUID.randomUUID().toString();
         GastosCompartidos nuevaCuenta = new GastosCompartidos(idCuenta, dto.nombre, listaParticipantes, mapaPorcentajes);
         
-        for (Persona p : listaParticipantes) p.agregarCuenta(nuevaCuenta);
+        for (Persona p : listaParticipantes) {
+            p.agregarCuenta(nuevaCuenta);
+            repositorio.actualizarUsuario(p); // Importante: guardar cada participante modificado
+        }
 
         if (dto.gastos != null) {
             for (GastoDTO gDto : dto.gastos) {
                 Categoria cat = crearCategoriaSiNoExiste(gDto.categoria);
-                Persona pagador = usuariosPorNombre.get(gDto.nombreUsuarioPagador);
+                Persona pagador = repositorio.buscarUsuarioPorNombre(gDto.nombreUsuarioPagador);
                 if (pagador == null && !listaParticipantes.isEmpty()) pagador = listaParticipantes.get(0);
                 
-                // Parseo de fecha flexible (el DTO trae String)
-                LocalDate fecha = LocalDate.parse(gDto.fecha); // Asume yyyy-MM-dd estándar
-
+                LocalDate fecha = LocalDate.parse(gDto.fecha);
                 String idGasto = UUID.randomUUID().toString();
                 Gasto nuevoGasto = new Gasto(idGasto, BigDecimal.valueOf(gDto.importe), fecha, cat, pagador, gDto.descripcion, nuevaCuenta);
                 nuevaCuenta.agregarGasto(nuevoGasto);
             }
         }
-        
-        // Importante: comprobar alertas tras importación masiva
         comprobarAlertas();
     }
     
-    // --- GESTIÓN DE ALERTAS Y NOTIFICACIONES ---
+    // --- ALERTAS ---
 
     public void crearAlerta(String nombre, Periodicidad periodicidad, String nombreCategoria, double umbralMaximo) {
         if (usuarioAutenticado == null) return;
@@ -374,14 +372,14 @@ public class Controlador {
         }
 
         String id = UUID.randomUUID().toString();
-        // Usamos el Patrón Estrategia: "EstrategiaPorUmbral"
         Alerta alerta = new Alerta(id, nombre, periodicidad, cat, new EstrategiaPorUmbral(umbralMaximo));
         
         usuarioAutenticado.agregarAlerta(alerta);
         
-        System.out.println(">> [Controlador] Alerta creada: " + alerta);
+        // Guardamos cambios
+        repositorio.actualizarUsuario(usuarioAutenticado);
         
-        // Comprobamos inmediatamente por si ya se ha pasado
+        System.out.println(">> [Controlador] Alerta creada y guardada: " + alerta);
         comprobarAlertas();
         notificarModeloCambiado();
     }
@@ -389,33 +387,25 @@ public class Controlador {
     public void borrarAlerta(Alerta alerta) {
         if (usuarioAutenticado != null) {
             usuarioAutenticado.eliminarAlerta(alerta);
+            repositorio.actualizarUsuario(usuarioAutenticado); // Guardamos cambios
             notificarModeloCambiado();
         }
     }
 
-    /**
-     * Recorre todas las alertas del usuario, calcula el gasto acumulado relevante
-     * y genera notificaciones si corresponde.
-     */
     private void comprobarAlertas() {
         if (usuarioAutenticado == null) return;
 
-        List<Gasto> todosLosGastos = getGastosUsuarioActual(); // Obtiene gastos de todas las cuentas
+        List<Gasto> todosLosGastos = getGastosUsuarioActual();
         LocalDate hoy = LocalDate.now();
+        boolean algunaDisparada = false;
 
         for (Alerta alerta : usuarioAutenticado.getAlertas()) {
-            
-            // 1. Filtrar gastos que aplican a esta alerta (Fecha y Categoría)
             double totalAcumulado = todosLosGastos.stream()
                 .filter(g -> {
-                    // A. Filtro de Categoría
                     if (alerta.getCategoriaOpcional().isPresent()) {
                         if (!g.getCategoria().equals(alerta.getCategoriaOpcional().get())) return false;
                     }
-                    
-                    // B. Filtro de Periodicidad
                     if (alerta.getPeriodicidad() == Periodicidad.MENSUAL) {
-                        // Mismo mes y año
                         return g.getFecha().getMonth() == hoy.getMonth() && g.getFecha().getYear() == hoy.getYear();
                     } else {
                         WeekFields weekFields = WeekFields.of(Locale.getDefault());
@@ -424,13 +414,17 @@ public class Controlador {
                         return semanaGasto == semanaHoy && g.getFecha().getYear() == hoy.getYear();
                     }
                 })
-                .mapToDouble(g -> g.getCostePara(usuarioAutenticado).doubleValue()) // Importante: Usamos MI coste
+                .mapToDouble(g -> g.getCostePara(usuarioAutenticado).doubleValue())
                 .sum();
 
-            // 2. Preguntar a la alerta (Estrategia) si se dispara
             if (alerta.comprobar(totalAcumulado)) {
                 generarNotificacion(alerta, totalAcumulado);
+                algunaDisparada = true;
             }
+        }
+        
+        if (algunaDisparada) {
+            repositorio.actualizarUsuario(usuarioAutenticado); // Guardamos las nuevas notificaciones
         }
     }
 

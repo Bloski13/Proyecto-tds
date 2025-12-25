@@ -4,17 +4,20 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 
+@JsonIdentityInfo(generator = ObjectIdGenerators.PropertyGenerator.class, property = "id")
 public class Persona {
-    private final String id;
+    private String id;
     private String nombreCompleto;
     private String nombreUsuario;
     private String contraseña;
     
-    private final List<GastosCompartidos> misCuentas; 
+    private List<GastosCompartidos> misCuentas; 
     
-    private final List<Alerta> alertasConfiguradas;
-    private final List<Notificacion> historialNotificaciones;
+    private List<Alerta> alertasConfiguradas;
+    private List<Notificacion> historialNotificaciones;
 
     public Persona(String id, String nombreCompleto, String nombreUsuario, String contraseña) {
         if (id == null || nombreCompleto == null || nombreUsuario == null || contraseña == null) {
@@ -25,6 +28,12 @@ public class Persona {
         this.nombreUsuario = nombreUsuario;
         this.contraseña = contraseña;
         this.misCuentas = new ArrayList<>(); 
+        this.alertasConfiguradas = new ArrayList<>();
+        this.historialNotificaciones = new ArrayList<>();
+    }
+    // Necesario para JSON
+    public Persona() {
+        this.misCuentas = new ArrayList<>();
         this.alertasConfiguradas = new ArrayList<>();
         this.historialNotificaciones = new ArrayList<>();
     }
@@ -69,6 +78,21 @@ public class Persona {
 
     public List<Notificacion> getNotificaciones() {
         return Collections.unmodifiableList(historialNotificaciones);
+    }
+    
+ // Jackson usará esto para cargar las cuentas
+    public void setCuentas(List<GastosCompartidos> cuentas) {
+        this.misCuentas = cuentas;
+    }
+
+    // Jackson usará esto para cargar las alertas
+    public void setAlertas(List<Alerta> alertas) {
+        this.alertasConfiguradas = alertas;
+    }
+
+    // Jackson usará esto para cargar notificaciones
+    public void setNotificaciones(List<Notificacion> notificaciones) {
+        this.historialNotificaciones = notificaciones;
     }
     
     @Override

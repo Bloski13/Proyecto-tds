@@ -1,13 +1,17 @@
 package es.um.gestiongastos.model;
 
 import java.math.BigDecimal;
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.Objects;
 
+@JsonIdentityInfo(generator = ObjectIdGenerators.PropertyGenerator.class, property = "id")
 public class Gasto {
-    private final String id;
+    private String id;
     private BigDecimal importe;
+    @com.fasterxml.jackson.annotation.JsonFormat(shape = com.fasterxml.jackson.annotation.JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
     private LocalDate fecha;
     private Categoria categoria;
     private Persona pagador;
@@ -25,6 +29,7 @@ public class Gasto {
         this.descripcion = descripcion;
         this.cuenta = cuenta;
     }
+    public Gasto() {};
 
     public String getId() { return id; }
     

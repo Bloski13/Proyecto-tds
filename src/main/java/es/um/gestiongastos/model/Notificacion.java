@@ -4,17 +4,21 @@ package es.um.gestiongastos.model;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+
 public class Notificacion {
-    private final String id;
-    private final LocalDateTime fechaHora;
-    private final String mensaje;
+    private String id;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime fechaHora;
+    private String mensaje;
 
     public Notificacion(String id, LocalDateTime fechaHora, String mensaje) {
         this.id = id;
         this.fechaHora = fechaHora;
         this.mensaje = mensaje;
     }
-
+    public Notificacion() {}
+    
     public String getId() { return id; }
     public LocalDateTime getFechaHora() { return fechaHora; }
     public String getMensaje() { return mensaje; }

@@ -3,11 +3,11 @@ package es.um.gestiongastos.model;
 import java.util.Optional;
 
 public class Alerta {
-    private final String id;
+    private String id;
     private String nombre;
-    private final Periodicidad periodicidad;
-    private final Categoria categoriaOpcional; // Puede ser null
-    private final EstrategiaAlerta estrategia; // Patrón Estrategia
+    private Periodicidad periodicidad;
+    private Categoria categoriaOpcional; // Puede ser null
+    private EstrategiaAlerta estrategia; // Patrón Estrategia
 
     public Alerta(String id, String nombre, Periodicidad periodicidad, Categoria categoriaOpcional, EstrategiaAlerta estrategia) {
         this.id = id;
@@ -16,6 +16,8 @@ public class Alerta {
         this.categoriaOpcional = categoriaOpcional;
         this.estrategia = estrategia;
     }
+    
+    public Alerta() {};
 
     public String getId() { return id; }
     public String getNombre() { return nombre; }

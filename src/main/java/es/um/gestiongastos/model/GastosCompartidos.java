@@ -1,19 +1,22 @@
 package es.um.gestiongastos.model;
 
 import java.math.BigDecimal;
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import java.math.RoundingMode;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@JsonIdentityInfo(generator = ObjectIdGenerators.PropertyGenerator.class, property = "id")
 public class GastosCompartidos {
-    private final String id;
+    private String id;
     private String nombre;
-    private final List<Participante> participantes;
+    private List<Participante> participantes;
     private boolean porcentajesFijos;
     
-    private final List<Gasto> historialGastos = new ArrayList<>();
+    private List<Gasto> historialGastos = new ArrayList<>();
 
-    private static final double EPS = 0.001;
+    private static final double EPS = 0.011;
 
     public GastosCompartidos(String id, String nombre, Collection<Persona> participantes, Map<Persona, Double> porcentajes) {
         if (id == null || nombre == null) throw new IllegalArgumentException("id y nombre no pueden ser nulos");
@@ -44,6 +47,12 @@ public class GastosCompartidos {
             }
         }
         this.participantes = Collections.unmodifiableList(list);
+    }
+
+    public GastosCompartidos() {
+        // Inicializamos las listas como ArrayList editables
+        this.historialGastos = new ArrayList<>();
+        this.participantes = new ArrayList<>();
     }
 
     public String getId() { return id; }
@@ -128,6 +137,25 @@ public class GastosCompartidos {
         BigDecimal incrementoPagador = importe.subtract(suParteTeorica).add(diferencia);
         pag.setSaldo(pag.getSaldo().add(incrementoPagador));
     }
+    
+ // --- SETTERS PARA JSON ---
+
+    public void setGastos(List<Gasto> gastos) {
+        if (gastos == null) {
+            this.historialGastos = new ArrayList<>();
+        } else {
+            // Creamos una COPIA editable. 
+            this.historialGastos = new ArrayList<>(gastos);
+        }
+    }
+
+    public void setParticipantes(List<Participante> participantes) {
+        if (participantes == null) {
+            this.participantes = new ArrayList<>();
+        } else {
+            this.participantes = new ArrayList<>(participantes);
+        }
+    }
 
     @Override
     public String toString() {
@@ -136,7 +164,7 @@ public class GastosCompartidos {
 
     // Clase interna Participante (sin cambios mayores, solo getters/setters package-private)
     public static class Participante {
-        private final Persona persona;
+        private Persona persona;
         private double porcentaje; 
         private BigDecimal saldo; 
 
@@ -145,9 +173,11 @@ public class GastosCompartidos {
             this.porcentaje = porcentaje;
             this.saldo = saldoInicial != null ? saldoInicial : BigDecimal.ZERO;
         }
+        public Participante() {}
         public Persona getPersona() { return persona; }
         public double getPorcentaje() { return porcentaje; }
         public BigDecimal getSaldo() { return saldo; }
+        void setPersona(Persona persona) { this.persona = persona; }
         void setPorcentaje(double porcentaje) { this.porcentaje = porcentaje; }
         void setSaldo(BigDecimal nuevoSaldo) { this.saldo = nuevoSaldo; }
         
