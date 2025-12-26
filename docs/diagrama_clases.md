@@ -1,3 +1,3 @@
 # Diagrama de clases
 
-(Agregar diagrama aquí)
+![Diagrama de Clases de AppGastos](imagenes/diagrama.drawio.png)
