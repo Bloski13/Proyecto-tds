@@ -8,3 +8,5 @@ public class App {
         VentanaInicioSesion.main(args); // Delegamos en la clase JavaFX
     }
 }
+
+
