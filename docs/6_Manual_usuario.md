@@ -45,7 +45,9 @@ En la pestaña "Cuentas y Alertas", encontrarás el panel izquierdo dedicado a l
 pulsar este botón se abrirá el explorador de archivos y podremos seleccionar archivos con cuentas ya existentes, como la que
 hemos importado en el apartado anterior, proveniente de un JSON.
 ![Pantalla de Visualización de Cuentas y Detalle de una de ellas](imagenes/man03-cuentas.png)
-* **Crear Cuenta:** Pulsa "Nueva Cuenta" para iniciar el asistente. Podrás seleccionar a los participantes y definir si el reparto es equitativo o por porcentajes personalizados.
+* **Crear Cuenta:** Pulsa "Nueva Cuenta" para iniciar el asistente. Podrás seleccionar a los participantes y definir si el reparto es equitativo
+o por porcentajes personalizados.
+
 ![Pantalla de Creación de Cuenta Compartida](imagenes/man03-nueva_cuenta1.png)
 ![Pantalla de Creación de Cuenta Compartida](imagenes/man03-nueva_cuenta2.png)
 
