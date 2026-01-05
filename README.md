@@ -1,10 +1,66 @@
+# Proyecto TDS: Gestión de Gastos
 
-# GestionGastos (esqueleto)
+Aplicación de escritorio para la gestión de gastos personales y cuentas compartidas, desarrollada en Java con JavaFX.
 
-Proyecto inicial (Maven) con las clases del dominio para la práctica *Gestión de Gastos*.
-Contiene las clases Java (sin persistencia ni GUI) y un `main` de pruebas.
+## 👥 Integrantes del Grupo
 
-Importar en Eclipse: **File → Import → Existing Maven Projects** y seleccionar el directorio raíz del proyecto.
+| Nombre Completo | Email | Subgrupo |
+| :--- | :--- | :--- |
+| Pablo Asensio Muñoz | pablo.asensiom@um.es | PCEO |
+| Álvaro Sancho Fernández | a.sanchofernandez@um.es | PCEO |
+| Patricia Conesa Gallego | patricia.conesag@um.es | PCEO|
 
-Este proyecto se ha generado a partir del enunciado de la práctica (TDS-GestionGastos-v.0.1.pdf).
+---
 
+## 📄 Descripción del Proyecto
+
+**AppGastos** es una herramienta diseñada para controlar la economía personal y facilitar el reparto de gastos en grupos (viajes, pisos de estudiantes, regalos, etc.).
+
+### Funcionalidades principales:
+* **Gestión de Usuarios:** Registro e inicio de sesión seguro.
+* **Control de Gastos:** Registro de movimientos con fecha, categoría, y descripción.
+* **Cuentas Compartidas:** Creación de grupos con reparto de gastos (equitativo o por porcentajes) y cálculo automático de deudas.
+* **Importación:** Carga de datos desde ficheros externos (CSV, JSON, YAML).
+* **Alertas:** Sistema de notificaciones cuando se supera un umbral de gasto definido.
+* **Informes:** Visualización gráfica (barras y circular) del estado financiero.
+
+### Tecnologías utilizadas:
+* **Lenguaje:** Java 21.
+* **Interfaz:** JavaFX.
+* **Construcción:** Maven.
+* **Persistencia:** JSON 
+
+---
+
+## 🚀 Cómo ejecutar el proyecto
+
+### Prerrequisitos
+* Tener instalado **Java JDK 21** o superior.
+* Tener instalado **Maven**.
+  
+*⚠️ NOTA IMPORTANTE:* El proyecto final funcional se encuentra en la rama **`master`**. Asegúrate de descargar o cambiar a esta rama antes de ejecutar.
+
+### Descarga y selección de rama
+Si clonas el repositorio con Git, ejecuta los siguientes comandos para asegurarte de estar en la versión correcta:
+
+```bash
+git clone https://github.com/bloski13/Proyecto-tds
+cd Proyecto-tds
+git checkout master
+```
+
+
+## 📚 Documentación del Proyecto
+A continuación se encuentran los enlaces a los documentos detallados de la práctica, ubicados en la carpeta **`\docs`**:
+
+* [Diagrama de Clases](docs/1_Diagrama_clases.md)
+
+* [Historias de Usuario](docs/2_Historias_usuario.md)
+
+* [Diagrama de Interacción](docs/3_Diagrama_interaccion.md)
+
+* [Arquitectura de la Aplicación](docs/4_Arquitectura_app.md)
+
+* [Patrones de Diseño](docs/5_Patrones_diseño.md)
+
+* [Manual de Usuario](docs/6_Manual_usuario.md)
